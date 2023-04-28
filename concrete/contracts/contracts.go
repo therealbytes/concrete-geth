@@ -13,52 +13,55 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package vm
+package contracts
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm/concrete"
-	cc_api "github.com/ethereum/go-ethereum/core/vm/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 )
 
 var (
-	ConcretePrecompiledAddresses []common.Address
+	precompiles          = make(map[common.Address]api.Precompile)
+	precompiledAddresses = make([]common.Address, 0)
 )
 
-var ConcretePrecompiles = concrete.Precompiles
-
-func init() {
-	for k := range ConcretePrecompiles {
-		ConcretePrecompiledAddresses = append(ConcretePrecompiledAddresses, k)
+func AddPrecompile(addr common.Address, p api.Precompile) error {
+	if _, ok := precompiles[addr]; ok {
+		return fmt.Errorf("precompile already exists at address %x", addr)
 	}
+	precompiles[addr] = p
+	precompiledAddresses = append(precompiledAddresses, addr)
+	return nil
 }
 
-// ActiveConcretePrecompiles returns the precompiles enabled with the current configuration.
-func ActiveConcretePrecompiles() []common.Address {
-	return ConcretePrecompiledAddresses
+func GetPrecompile(addr common.Address) (api.Precompile, bool) {
+	pc, ok := precompiles[addr]
+	return pc, ok
 }
 
-// RunConcretePrecompile runs and evaluates the output of a precompiled contract.
-// It returns
-// - the returned bytes,
-// - the _remaining_ gas,
-// - any error that occurred
-func RunConcretePrecompile(evm concrete.EVM, addr common.Address, p concrete.Precompile, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func ActivePrecompiles() []common.Address {
+	return precompiledAddresses
+}
+
+func RunPrecompile(evm api.EVM, addr common.Address, p api.Precompile, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	gasCost := p.RequiredGas(input)
 	if suppliedGas < gasCost {
-		return nil, 0, ErrOutOfGas
+		return nil, 0, errors.New("out of gas")
 	}
 	suppliedGas -= gasCost
 
 	if p.MutatesStorage(input) {
 		if readOnly {
-			return nil, suppliedGas, ErrWriteProtection
+			return nil, suppliedGas, errors.New("write protection")
 		}
 	} else {
-		evm = cc_api.NewReadOnlyEVM(evm)
+		evm = api.NewReadOnlyEVM(evm)
 	}
 
-	api := cc_api.New(evm, addr)
+	api := api.New(evm, addr)
 	output, err := p.Run(api, input)
 	return output, suppliedGas, err
 }

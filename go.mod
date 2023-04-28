@@ -57,8 +57,6 @@ require (
 	github.com/supranational/blst v0.3.8-0.20220526154634-513d2456b344
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tetratelabs/wazero v1.0.2
-	github.com/therealbytes/concrete-native-precompiles v0.0.0-20230423113303-facdc3216a73
-	github.com/therealbytes/concrete-wasm-precompiles v0.0.0-20230423113113-0ce6e530c2d3
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli/v2 v2.17.2-0.20221006022127-8f469abc00aa
 	golang.org/x/crypto v0.7.0

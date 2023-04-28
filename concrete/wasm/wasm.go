@@ -17,23 +17,21 @@ package wasm
 
 import (
 	"context"
-	_ "embed"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm/concrete/api"
-	"github.com/ethereum/go-ethereum/core/vm/concrete/wasm/bridge"
-	"github.com/ethereum/go-ethereum/core/vm/concrete/wasm/bridge/native"
+	"github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/tetratelabs/wazero"
 	wz_api "github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/therealbytes/concrete-wasm-precompiles/wasm"
 )
 
 var (
 	WASM_IS_PURE         = "concrete_IsPure"
 	WASM_MUTATES_STORAGE = "concrete_MutatesStorage"
 	WASM_REQUIRED_GAS    = "concrete_RequiredGas"
-	WASM_NEW             = "concrete_New"
+	WASM_FINALISE        = "concrete_Finalise"
 	WASM_COMMIT          = "concrete_Commit"
 	WASM_RUN             = "concrete_Run"
 	WASM_EVM_BRIDGE      = "concrete_EvmBridge"
@@ -41,17 +39,6 @@ var (
 	WASM_ADDRESS_BRIDGE  = "concrete_AddressBridge"
 	WASM_LOG_BRIDGE      = "concrete_LogBridge"
 )
-
-var (
-	Precompiles = map[common.Address]api.Precompile{}
-)
-
-func init() {
-	for addr, code := range wasm.PrecompilesWasm {
-		println("Registering precompile", addr.Hex(), len(code))
-		Precompiles[addr] = NewWasmPrecompile(code)
-	}
-}
 
 func NewWasmPrecompile(code []byte) api.Precompile {
 	ctx := context.Background()
@@ -132,7 +119,7 @@ func (p *StatelessWasmPrecompile) RequiredGas(input []byte) uint64 {
 	return p.statelessCall_Bytes_Uint64(&WASM_REQUIRED_GAS, input)
 }
 
-func (p *StatelessWasmPrecompile) New(api api.API) error {
+func (p *StatelessWasmPrecompile) Finalise(api api.API) error {
 	return nil
 }
 
@@ -196,7 +183,6 @@ func statefulPrecompileWorker(ctx context.Context, code []byte, workerIn__Err ch
 
 	for {
 		select {
-
 		case <-ctx.Done():
 			return
 
@@ -225,7 +211,6 @@ func statefulPrecompileWorker(ctx context.Context, code []byte, workerIn__Err ch
 			retPointer := bridge.MemPointer(_retPointer[0])
 			retValues, retErr := native.GetReturnWithError(ctx, mod, retPointer)
 			payload.out <- &workerResponse_BytesErr{retValues[0], retErr}
-
 		}
 
 		native.PruneMemory(ctx, mod)
@@ -264,8 +249,8 @@ func (p *StatefulWasmPrecompile) MutatesStorage(input []byte) bool {
 	return _mutates != 0
 }
 
-func (p *StatefulWasmPrecompile) New(api api.API) error {
-	return p.statefulCall__Err(api, &WASM_NEW)
+func (p *StatefulWasmPrecompile) Finalise(api api.API) error {
+	return p.statefulCall__Err(api, &WASM_FINALISE)
 }
 
 func (p *StatefulWasmPrecompile) Commit(api api.API) error {

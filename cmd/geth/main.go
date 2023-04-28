@@ -15,7 +15,7 @@
 // along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 // geth is the official command-line client for Ethereum.
-package main
+package geth
 
 import (
 	"fmt"
@@ -208,6 +208,7 @@ var (
 )
 
 var app = flags.NewApp("the go-ethereum command line interface")
+var App = app
 
 func init() {
 	// Initialize the CLI app and start Geth
@@ -269,6 +270,7 @@ func init() {
 	}
 }
 
+//nolint:unused
 func main() {
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)

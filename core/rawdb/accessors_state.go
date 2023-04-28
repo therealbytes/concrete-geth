@@ -39,11 +39,6 @@ func WritePreimages(db ethdb.KeyValueWriter, preimages map[common.Hash][]byte) {
 	preimageHitCounter.Inc(int64(len(preimages)))
 }
 
-func ReadConcretePreimage(db ethdb.KeyValueReader, hash common.Hash) []byte {
-	data, _ := db.Get(concretePreimageKey(hash))
-	return data
-}
-
 // ReadCode retrieves the contract code of the provided code hash.
 func ReadCode(db ethdb.KeyValueReader, hash common.Hash) []byte {
 	// Try with the prefixed code scheme first, if not then try with legacy
@@ -84,18 +79,6 @@ func HasCodeWithPrefix(db ethdb.KeyValueReader, hash common.Hash) bool {
 	return ok
 }
 
-func WriteConcretePreimages(db ethdb.KeyValueWriter, concretePreimages map[common.Hash][]byte) {
-	for hash, pi := range concretePreimages {
-		WriteConcretePreimage(db, hash, pi)
-	}
-}
-
-func WriteConcretePreimage(db ethdb.KeyValueWriter, hash common.Hash, concretePreimage []byte) {
-	if err := db.Put(concretePreimageKey(hash), concretePreimage); err != nil {
-		log.Crit("Failed to store hot preimage", "err", err)
-	}
-}
-
 // WriteCode writes the provided contract code database.
 func WriteCode(db ethdb.KeyValueWriter, hash common.Hash, code []byte) {
 	if err := db.Put(codeKey(hash), code); err != nil {
@@ -107,5 +90,22 @@ func WriteCode(db ethdb.KeyValueWriter, hash common.Hash, code []byte) {
 func DeleteCode(db ethdb.KeyValueWriter, hash common.Hash) {
 	if err := db.Delete(codeKey(hash)); err != nil {
 		log.Crit("Failed to delete contract code", "err", err)
+	}
+}
+
+func ReadConcretePreimage(db ethdb.KeyValueReader, hash common.Hash) []byte {
+	data, _ := db.Get(concretePreimageKey(hash))
+	return data
+}
+
+func WriteConcretePreimages(db ethdb.KeyValueWriter, concretePreimages map[common.Hash][]byte) {
+	for hash, pi := range concretePreimages {
+		WriteConcretePreimage(db, hash, pi)
+	}
+}
+
+func WriteConcretePreimage(db ethdb.KeyValueWriter, hash common.Hash, concretePreimage []byte) {
+	if err := db.Put(concretePreimageKey(hash), concretePreimage); err != nil {
+		log.Crit("Failed to store hot preimage", "err", err)
 	}
 }

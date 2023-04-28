@@ -19,27 +19,34 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm/concrete/api"
+	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 )
 
-func GetData(data []byte, start uint64, size uint64) []byte {
-	length := uint64(len(data))
-	if start > length {
-		start = length
-	}
-	end := start + size
-	if end > length {
-		end = length
-	}
-	return common.RightPadBytes(data[start:end], int(size))
+type Blank struct{}
+
+func (op *Blank) MutatesStorage(input []byte) bool {
+	return false
 }
 
-var (
-	errInvalidSelect = errors.New("invalid select value")
-)
+func (op *Blank) RequiredGas(input []byte) uint64 {
+	return 0
+}
 
-type PrecompileDemux map[int]api.Precompile
+func (op *Blank) Finalise(api cc_api.API) error {
+	return nil
+}
+
+func (op *Blank) Commit(api cc_api.API) error {
+	return nil
+}
+
+func (op *Blank) Run(api cc_api.API, input []byte) ([]byte, error) {
+	return []byte{}, nil
+}
+
+var _ cc_api.Precompile = &Blank{}
+
+type PrecompileDemux map[int]cc_api.Precompile
 
 func (d PrecompileDemux) getSelect(input []byte) int {
 	return int(new(big.Int).SetBytes(GetData(input, 0, 32)).Uint64())
@@ -63,16 +70,16 @@ func (d PrecompileDemux) RequiredGas(input []byte) uint64 {
 	return pc.RequiredGas(input[32:])
 }
 
-func (d PrecompileDemux) New(api api.API) error {
+func (d PrecompileDemux) Finalise(api cc_api.API) error {
 	for _, pc := range d {
-		if err := pc.New(api); err != nil {
+		if err := pc.Finalise(api); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (d PrecompileDemux) Commit(api api.API) error {
+func (d PrecompileDemux) Commit(api cc_api.API) error {
 	for _, pc := range d {
 		if err := pc.Commit(api); err != nil {
 			return err
@@ -81,11 +88,13 @@ func (d PrecompileDemux) Commit(api api.API) error {
 	return nil
 }
 
-func (d PrecompileDemux) Run(api api.API, input []byte) ([]byte, error) {
+func (d PrecompileDemux) Run(api cc_api.API, input []byte) ([]byte, error) {
 	sel := d.getSelect(input)
 	pc, ok := d[sel]
 	if !ok {
-		return nil, errInvalidSelect
+		return nil, errors.New("invalid select value")
 	}
 	return pc.Run(api, input[32:])
 }
+
+var _ cc_api.Precompile = &PrecompileDemux{}

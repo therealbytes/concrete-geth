@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package core
+package tinygo
 
 import (
 	"reflect"
@@ -21,13 +21,21 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm/concrete/api"
-	"github.com/ethereum/go-ethereum/core/vm/concrete/wasm/bridge"
-	"github.com/ethereum/go-ethereum/core/vm/concrete/wasm/bridge/wasm"
+	"github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
 )
 
 // Note: This uses a uint64 instead of two result values for compatibility with
 // WebAssembly 1.0.
+
+var precompile api.Precompile
+var precompileIsPure bool
+
+func WasmWrap(pc api.Precompile, isPure bool) {
+	precompile = pc
+	precompileIsPure = isPure
+}
 
 type memory struct{}
 
@@ -49,8 +57,10 @@ func (m *memory) Deref(pointer bridge.MemPointer) []byte {
 	offset, size := pointer.Unpack()
 	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: uintptr(offset),
-		Len:  uintptr(size),
-		Cap:  uintptr(size),
+		//nolint:typecheck
+		Len: uintptr(size),
+		//nolint:typecheck
+		Cap: uintptr(size),
 	}))
 }
 
@@ -62,31 +72,6 @@ func PutValue(value []byte) uint64 {
 
 func GetValue(pointer uint64) []byte {
 	return wasm.GetValue(Memory, bridge.MemPointer(pointer))
-}
-
-//go:wasm-module env
-//export concrete_EvmBridge
-func _EvmBridge(pointer uint64) uint64
-
-func EvmBridge(pointer uint64) uint64 {
-	return _EvmBridge(pointer)
-}
-
-//go:wasm-module env
-//export concrete_StateDBBridge
-func _StateDBBridge(pointer uint64) uint64
-
-func StateDBBridge(pointer uint64) uint64 {
-	return _StateDBBridge(pointer)
-}
-
-//go:wasm-module env
-//export concrete_AddressBridge
-func _AddressBridge(pointer uint64) uint64
-
-func AddressBridge() common.Address {
-	pointer := _AddressBridge(0)
-	return common.BytesToAddress(Memory.Deref(bridge.MemPointer(pointer)))
 }
 
 var allocs = sync.Map{}
@@ -119,6 +104,31 @@ func Prune() {
 	allocs = sync.Map{}
 }
 
+//go:wasm-module env
+//export concrete_EvmBridge
+func _EvmBridge(pointer uint64) uint64
+
+func EvmBridge(pointer uint64) uint64 {
+	return _EvmBridge(pointer)
+}
+
+//go:wasm-module env
+//export concrete_StateDBBridge
+func _StateDBBridge(pointer uint64) uint64
+
+func StateDBBridge(pointer uint64) uint64 {
+	return _StateDBBridge(pointer)
+}
+
+//go:wasm-module env
+//export concrete_AddressBridge
+func _AddressBridge(pointer uint64) uint64
+
+func AddressBridge() common.Address {
+	pointer := _AddressBridge(0)
+	return common.BytesToAddress(Memory.Deref(bridge.MemPointer(pointer)))
+}
+
 func NewAPI() api.API {
 	evm := wasm.NewProxyEVM(Memory, EvmBridge, StateDBBridge)
 	return api.New(evm, AddressBridge())
@@ -127,4 +137,50 @@ func NewAPI() api.API {
 func NewStateAPI() api.API {
 	statedb := wasm.NewProxyStateDB(Memory, StateDBBridge)
 	return api.NewStateAPI(statedb, AddressBridge())
+}
+
+//export concrete_IsPure
+func IsPure() uint64 {
+	if precompileIsPure {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+//export concrete_MutatesStorage
+func MutatesStorage(pointer uint64) uint64 {
+	input := GetValue(pointer)
+	if precompile.MutatesStorage(input) {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+//export concrete_RequiredGas
+func RequiredGas(pointer uint64) uint64 {
+	input := GetValue(pointer)
+	gas := precompile.RequiredGas(input)
+	return uint64(gas)
+}
+
+//export concrete_Finalise
+func Finalise() uint64 {
+	precompile.Finalise(NewStateAPI())
+	return bridge.NullPointer.Uint64()
+}
+
+//export concrete_Commit
+func Commit() uint64 {
+	precompile.Commit(NewStateAPI())
+	return bridge.NullPointer.Uint64()
+}
+
+//export concrete_Run
+func Run(pointer uint64) uint64 {
+	input := GetValue(pointer)
+	api := NewAPI()
+	output, err := precompile.Run(api, input)
+	return wasm.PutReturnWithError(Memory, [][]byte{output}, err).Uint64()
 }

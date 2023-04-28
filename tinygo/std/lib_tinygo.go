@@ -20,7 +20,7 @@ package std
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/core/vm/concrete/wasm/tinygo/core"
+	"github.com/ethereum/go-ethereum/tinygo"
 )
 
 //go:wasm-module env
@@ -29,6 +29,6 @@ func _LogBridge(pointer uint64) uint64
 
 func Log(a ...any) uint64 {
 	msg := fmt.Sprintln(a...)
-	pointer := core.PutValue([]byte(msg[:len(msg)-1]))
+	pointer := tinygo.PutValue([]byte(msg[:len(msg)-1]))
 	return _LogBridge(pointer)
 }

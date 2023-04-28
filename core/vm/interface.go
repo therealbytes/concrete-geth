@@ -20,8 +20,8 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/core/types"
-	cc_api "github.com/ethereum/go-ethereum/core/vm/concrete/api"
 	"github.com/ethereum/go-ethereum/params"
 )
 

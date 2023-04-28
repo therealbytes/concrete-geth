@@ -8,10 +8,6 @@ FROM golang:1.20-alpine as builder
 
 RUN apk add --no-cache gcc musl-dev linux-headers git
 
-# Get credentials for private repos
-COPY ./.netrc /root/.netrc
-RUN chmod 600 /root/.netrc
-
 # Get dependencies - will also be cached if we won't change go.mod/go.sum
 COPY go.mod /go-ethereum/
 COPY go.sum /go-ethereum/

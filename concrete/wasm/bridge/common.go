@@ -115,7 +115,7 @@ func UnpackPointers(data []byte) []MemPointer {
 	for i := 0; i < len(data); i += 8 {
 		var pointer MemPointer
 		pointer.Decode(data[i : i+8])
-		pointers = append(pointers, MemPointer(pointer))
+		pointers = append(pointers, pointer)
 	}
 	return pointers
 }

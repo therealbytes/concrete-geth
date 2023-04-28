@@ -16,9 +16,17 @@
 package api
 
 import (
+	"hash"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"golang.org/x/crypto/sha3"
+)
+
+var (
+	HashRegistryAddress = common.BytesToAddress(crypto.Keccak256([]byte("concrete.HashRegistry.v0")))
 )
 
 type StateDB interface {
@@ -33,6 +41,46 @@ type StateDB interface {
 	GetEphemeralPreimage(hash common.Hash) []byte
 	GetEphemeralPreimageSize(hash common.Hash) int
 }
+
+type ReadOnlyStateDB struct {
+	StateDB
+}
+
+func NewReadOnlyStateDB(db StateDB) StateDB {
+	return &ReadOnlyStateDB{db}
+}
+
+func (db *ReadOnlyStateDB) SetPersistentState(addr common.Address, key common.Hash, value common.Hash) {
+	panic("stateDB write protection")
+}
+
+func (db *ReadOnlyStateDB) SetEphemeralState(addr common.Address, key common.Hash, value common.Hash) {
+	panic("stateDB write protection")
+}
+
+func (db *ReadOnlyStateDB) AddPersistentPreimage(hash common.Hash, preimage []byte) {
+	panic("stateDB write protection")
+}
+
+func (db *ReadOnlyStateDB) AddEphemeralPreimage(hash common.Hash, preimage []byte) {
+	panic("stateDB write protection")
+}
+
+var _ StateDB = &ReadOnlyStateDB{}
+
+type CommitSafeStateDB struct {
+	StateDB
+}
+
+func NewCommitSafeStateDB(db StateDB) StateDB {
+	return &CommitSafeStateDB{db}
+}
+
+func (db *CommitSafeStateDB) SetPersistentState(addr common.Address, key common.Hash, value common.Hash) {
+	panic("stateDB write protection")
+}
+
+var _ StateDB = &CommitSafeStateDB{}
 
 type EVM interface {
 	StateDB() StateDB
@@ -58,32 +106,25 @@ func (evm *ReadOnlyEVM) StateDB() StateDB {
 
 var _ EVM = &ReadOnlyEVM{}
 
-type ReadOnlyStateDB struct {
-	StateDB
+type CommitSafeEVM struct {
+	EVM
 }
 
-func (db *ReadOnlyStateDB) SetPersistentState(addr common.Address, key common.Hash, value common.Hash) {
-	panic("stateDB write protection")
+func NewCommitSafeEVM(evm EVM) EVM {
+	return &CommitSafeEVM{evm}
 }
 
-func (db *ReadOnlyStateDB) SetEphemeralState(addr common.Address, key common.Hash, value common.Hash) {
-	panic("stateDB write protection")
+func (evm *CommitSafeEVM) StateDB() StateDB {
+	return &CommitSafeStateDB{evm.EVM.StateDB()}
 }
 
-func (db *ReadOnlyStateDB) AddPersistentPreimage(hash common.Hash, preimage []byte) {
-	panic("stateDB write protection")
-}
-
-func (db *ReadOnlyStateDB) AddEphemeralPreimage(hash common.Hash, preimage []byte) {
-	panic("stateDB write protection")
-}
-
-var _ StateDB = &ReadOnlyStateDB{}
+var _ EVM = &CommitSafeEVM{}
 
 type Storage interface {
 	Set(key common.Hash, value common.Hash)
 	Get(key common.Hash) common.Hash
-	AddPreimage(hash common.Hash, preimage []byte)
+	AddPreimage(preimage []byte)
+	HasPreimage(hash common.Hash) bool
 	GetPreimage(hash common.Hash) []byte
 	GetPreimageSize(hash common.Hash) int
 }
@@ -101,15 +142,39 @@ func (s *PersistentStorage) Get(key common.Hash) common.Hash {
 	return s.db.GetPersistentState(s.address, key)
 }
 
-func (s *PersistentStorage) AddPreimage(hash common.Hash, preimage []byte) {
+func (s *PersistentStorage) AddPreimage(preimage []byte) {
+	if len(preimage) == 0 {
+		return
+	}
+	hash := Keccak256Hash(preimage)
+	s.db.SetPersistentState(HashRegistryAddress, hash, common.BytesToHash(common.Big1.Bytes()))
 	s.db.AddPersistentPreimage(hash, preimage)
 }
 
+func (s *PersistentStorage) HasPreimage(hash common.Hash) bool {
+	if hash == types.EmptyPreimageHash {
+		return true
+	}
+	return s.db.GetPersistentState(HashRegistryAddress, hash) == common.BytesToHash(common.Big1.Bytes())
+}
+
 func (s *PersistentStorage) GetPreimage(hash common.Hash) []byte {
+	if hash == types.EmptyPreimageHash {
+		return []byte{}
+	}
+	if !s.HasPreimage(hash) {
+		return nil
+	}
 	return s.db.GetPersistentPreimage(hash)
 }
 
 func (s *PersistentStorage) GetPreimageSize(hash common.Hash) int {
+	if hash == types.EmptyPreimageHash {
+		return 0
+	}
+	if !s.HasPreimage(hash) {
+		return -1
+	}
 	return s.db.GetPersistentPreimageSize(hash)
 }
 
@@ -128,15 +193,39 @@ func (s *EphemeralStorage) Get(key common.Hash) common.Hash {
 	return s.db.GetEphemeralState(s.address, key)
 }
 
-func (s *EphemeralStorage) AddPreimage(hash common.Hash, preimage []byte) {
+func (s *EphemeralStorage) AddPreimage(preimage []byte) {
+	if len(preimage) == 0 {
+		return
+	}
+	hash := Keccak256Hash(preimage)
+	s.db.SetEphemeralState(HashRegistryAddress, hash, common.BytesToHash(common.Big1.Bytes()))
 	s.db.AddEphemeralPreimage(hash, preimage)
 }
 
+func (s *EphemeralStorage) HasPreimage(hash common.Hash) bool {
+	if hash == types.EmptyPreimageHash {
+		return true
+	}
+	return s.db.GetEphemeralState(HashRegistryAddress, hash) == common.BytesToHash(common.Big1.Bytes())
+}
+
 func (s *EphemeralStorage) GetPreimage(hash common.Hash) []byte {
+	if hash == types.EmptyPreimageHash {
+		return []byte{}
+	}
+	if !s.HasPreimage(hash) {
+		return nil
+	}
 	return s.db.GetEphemeralPreimage(hash)
 }
 
 func (s *EphemeralStorage) GetPreimageSize(hash common.Hash) int {
+	if hash == types.EmptyPreimageHash {
+		return 0
+	}
+	if !s.HasPreimage(hash) {
+		return -1
+	}
 	return s.db.GetEphemeralPreimageSize(hash)
 }
 
@@ -173,8 +262,10 @@ type API interface {
 }
 
 type stateApi struct {
-	address common.Address
-	db      StateDB
+	address    common.Address
+	db         StateDB
+	persistent Datastore
+	ephemeral  Datastore
 }
 
 func NewStateAPI(db StateDB, address common.Address) API {
@@ -197,17 +288,23 @@ func (s *stateApi) StateDB() StateDB {
 }
 
 func (s *stateApi) Persistent() Datastore {
-	return &datastore{&PersistentStorage{
-		address: s.address,
-		db:      s.db,
-	}}
+	if s.persistent == nil {
+		s.persistent = &datastore{&PersistentStorage{
+			address: s.address,
+			db:      s.db,
+		}}
+	}
+	return s.persistent
 }
 
 func (s *stateApi) Ephemeral() Datastore {
-	return &datastore{&EphemeralStorage{
-		address: s.address,
-		db:      s.db,
-	}}
+	if s.ephemeral == nil {
+		s.ephemeral = &datastore{&EphemeralStorage{
+			address: s.address,
+			db:      s.db,
+		}}
+	}
+	return s.ephemeral
 }
 
 func (s *stateApi) BlockHash(block *big.Int) common.Hash {
@@ -249,7 +346,27 @@ var _ API = (*api)(nil)
 type Precompile interface {
 	MutatesStorage(input []byte) bool
 	RequiredGas(input []byte) uint64
-	New(api API) error
+	Finalise(api API) error
 	Commit(api API) error
 	Run(api API, input []byte) ([]byte, error)
+}
+
+// Re-implementation of Keccak256Hash so we it can be used from tinyGo
+
+type KeccakState interface {
+	hash.Hash
+	Read([]byte) (int, error)
+}
+
+func NewKeccakState() KeccakState {
+	return sha3.NewLegacyKeccak256().(KeccakState)
+}
+
+func Keccak256Hash(data ...[]byte) (h common.Hash) {
+	d := NewKeccakState()
+	for _, b := range data {
+		d.Write(b)
+	}
+	d.Read(h[:])
+	return h
 }

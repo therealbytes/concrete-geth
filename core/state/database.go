@@ -24,7 +24,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/trie"
 )
@@ -209,9 +208,6 @@ func (db *cachingDB) CopyTrie(t Trie) Trie {
 }
 
 func (db *cachingDB) ConcretePreimage(hash common.Hash) ([]byte, error) {
-	if hash == crypto.Keccak256Hash([]byte{}) {
-		return []byte{}, nil
-	}
 	preimage, _ := db.concretePreimageCache.Get(hash)
 	if len(preimage) > 0 {
 		return preimage, nil

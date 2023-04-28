@@ -21,8 +21,8 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm/concrete/api"
-	"github.com/ethereum/go-ethereum/core/vm/concrete/wasm/bridge"
+	"github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/log"
 	wz_api "github.com/tetratelabs/wazero/api"
 )

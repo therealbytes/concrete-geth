@@ -127,16 +127,6 @@ type (
 	addPreimageChange struct {
 		hash common.Hash
 	}
-	addPersistentPreimageChange struct {
-		hash common.Hash
-	}
-	addEphemeralPreimageChange struct {
-		hash common.Hash
-	}
-	ephemeralStorageChange struct {
-		account       *common.Address
-		key, prevalue common.Hash
-	}
 	touchChange struct {
 		account *common.Address
 	}
@@ -152,6 +142,16 @@ type (
 	transientStorageChange struct {
 		account       *common.Address
 		key, prevalue common.Hash
+	}
+	ephemeralPreimageChange struct {
+		hash common.Hash
+	}
+	ephemeralStorageChange struct {
+		account       *common.Address
+		key, prevalue common.Hash
+	}
+	persistentPreimageChange struct {
+		hash common.Hash
 	}
 )
 
@@ -258,34 +258,6 @@ func (ch addLogChange) dirtied() *common.Address {
 	return nil
 }
 
-func (ch addPersistentPreimageChange) revert(s *StateDB) {
-	if s.persistentPreimageDirties[ch.hash]--; s.persistentPreimageDirties[ch.hash] == 0 {
-		delete(s.persistentPreimageDirties, ch.hash)
-	}
-}
-
-func (ch addPersistentPreimageChange) dirtied() *common.Address {
-	return nil
-}
-
-func (ch addEphemeralPreimageChange) revert(s *StateDB) {
-	if s.ephemeralPreimageDirties[ch.hash]--; s.ephemeralPreimageDirties[ch.hash] == 0 {
-		delete(s.ephemeralPreimageDirties, ch.hash)
-	}
-}
-
-func (ch addEphemeralPreimageChange) dirtied() *common.Address {
-	return nil
-}
-
-func (ch ephemeralStorageChange) revert(s *StateDB) {
-	s.ephemeralStorage[*ch.account][ch.key] = ch.prevalue
-}
-
-func (ch ephemeralStorageChange) dirtied() *common.Address {
-	return nil
-}
-
 func (ch addPreimageChange) revert(s *StateDB) {
 	delete(s.preimages, ch.hash)
 }
@@ -316,5 +288,32 @@ func (ch accessListAddSlotChange) revert(s *StateDB) {
 }
 
 func (ch accessListAddSlotChange) dirtied() *common.Address {
+	return nil
+}
+
+func (ch ephemeralPreimageChange) revert(s *StateDB) {
+	delete(s.ephemeralPreimagesDirty, ch.hash)
+	if !s.hasEphemeralPreimage(ch.hash) {
+		delete(s.ephemeralPreimages, ch.hash)
+	}
+}
+
+func (ch ephemeralPreimageChange) dirtied() *common.Address {
+	return nil
+}
+
+func (ch ephemeralStorageChange) revert(s *StateDB) {
+	s.setEphemeralState(*ch.account, ch.key, ch.prevalue)
+}
+
+func (ch ephemeralStorageChange) dirtied() *common.Address {
+	return nil
+}
+
+func (ch persistentPreimageChange) revert(s *StateDB) {
+	delete(s.persistentPreimagesDirty, ch.hash)
+}
+
+func (ch persistentPreimageChange) dirtied() *common.Address {
 	return nil
 }

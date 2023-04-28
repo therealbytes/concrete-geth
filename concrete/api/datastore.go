@@ -16,32 +16,10 @@
 package api
 
 import (
-	"hash"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"golang.org/x/crypto/sha3"
 )
-
-// Re-implementation of Keccak256Hash so we it can be used from tinyGo
-
-type KeccakState interface {
-	hash.Hash
-	Read([]byte) (int, error)
-}
-
-func NewKeccakState() KeccakState {
-	return sha3.NewLegacyKeccak256().(KeccakState)
-}
-
-func Keccak256Hash(data ...[]byte) (h common.Hash) {
-	d := NewKeccakState()
-	for _, b := range data {
-		d.Write(b)
-	}
-	d.Read(h[:])
-	return h
-}
 
 type Datastore interface {
 	Storage
