@@ -22,34 +22,25 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/lib"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAddPrecompile(t *testing.T) {
 	pcs := ActivePrecompiles()
-	if len(pcs) != 0 {
-		t.Errorf("expected no precompiles")
-	}
+	require.Empty(t, pcs, "Expected no precompiles")
 
 	for i := byte(0); i < 10; i++ {
 		addr := common.BytesToAddress([]byte{i})
 		err := AddPrecompile(addr, &lib.Blank{})
-		if err != nil {
-			t.Error(err)
-		}
+		require.NoError(t, err, "AddPrecompile should not return an error")
 		_, ok := GetPrecompile(addr)
-		if !ok {
-			t.Errorf("expected precompile at address %x", addr)
-		}
+		require.True(t, ok, "Expected precompile at address %x", addr)
 		pcAddr := ActivePrecompiles()[i]
-		if pcAddr != addr {
-			t.Errorf("expected precompile at address %x, got %x", addr, pcAddr)
-		}
+		require.Equal(t, addr, pcAddr, "Expected precompile at address %x, got %x", addr, pcAddr)
 	}
 
 	pcs = ActivePrecompiles()
-	if len(pcs) != 10 {
-		t.Errorf("expected 10 precompiles")
-	}
+	require.Len(t, pcs, 10, "Expected 10 precompiles")
 }
 
 var (
@@ -84,7 +75,6 @@ func (p *testPrecompile) Run(api cc_api.API, input []byte) (output []byte, err e
 var _ cc_api.Precompile = (*testPrecompile)(nil)
 
 func TestRunPrecompile(t *testing.T) {
-
 	REQUIRED_GAS = uint64(10)
 	MUTATES_STORAGE = true
 
@@ -97,40 +87,27 @@ func TestRunPrecompile(t *testing.T) {
 	readOnly := false
 
 	_, _, err := RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-	if err == nil {
-		t.Errorf("expected error")
-	}
+	require.Error(t, err, "Expected error")
 
 	for ii := uint64(1); ii < 3; ii++ {
 		suppliedGas = ii * REQUIRED_GAS
 		_, remainingGas, err := RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-		if err != nil {
-			t.Error(err)
-		}
-		if remainingGas != suppliedGas-REQUIRED_GAS {
-			t.Errorf("expected 0 remaining gas, got %d", remainingGas)
-		}
+		require.NoError(t, err, "Error should be nil")
+		require.Equal(t, suppliedGas-REQUIRED_GAS, remainingGas, "unexpected remaining gas")
 	}
 
 	suppliedGas = REQUIRED_GAS
 
 	_, _, err = RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-	if err != nil {
-		t.Error(err)
-	}
+	require.NoError(t, err, "Error should be nil")
 
 	readOnly = true
 
 	_, _, err = RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-	if err == nil {
-		t.Errorf("expected error")
-	}
+	require.Error(t, err, "Expected error")
 
 	MUTATES_STORAGE = false
 
 	_, _, err = RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-	if err == nil {
-		t.Errorf("expected error")
-	}
-
+	require.Error(t, err, "Expected error")
 }

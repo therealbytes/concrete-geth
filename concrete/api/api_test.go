@@ -200,7 +200,7 @@ func testStorage(t *testing.T, storage Storage) {
 	storedPreimage = storage.GetPreimage(preimageHash)
 	require.Equal(t, preimage, storedPreimage, "GetPreimage should return correct preimage")
 	preimageSize = storage.GetPreimageSize(preimageHash)
-	require.Equal(t, len(preimage), preimageSize, "GetPreimageSize should return correct size")
+	require.Len(t, preimage, preimageSize, "GetPreimageSize should return correct size")
 }
 
 func fuzzStorage(t *testing.T, storage Storage) {
@@ -233,7 +233,7 @@ func fuzzStorage(t *testing.T, storage Storage) {
 			require.Equal(t, preimage, storedPreimage, "GetPreimage should return correct preimage")
 		}
 		preimageSize := storage.GetPreimageSize(preimageHash)
-		require.Equal(t, len(preimage), preimageSize, "GetPreimageSize should return correct size")
+		require.Len(t, preimage, preimageSize, "GetPreimageSize should return correct size")
 	}
 }
 
