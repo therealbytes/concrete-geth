@@ -237,6 +237,7 @@ type Set interface {
 	Add(value common.Hash)
 	Remove(value common.Hash)
 	Size() int
+	Values() Array
 }
 
 type set struct {
@@ -261,7 +262,14 @@ func (s *set) Id() common.Hash {
 }
 
 func (s *set) Has(value common.Hash) bool {
-	return s.indexMap().Get(value) != common.Hash{}
+	if s.Size() == 0 {
+		return false
+	}
+	index := s.indexMap().Get(value)
+	if index == (common.Hash{}) {
+		return value == s.valueArray().Get(0)
+	}
+	return index != common.Hash{}
 }
 
 func (s *set) Add(value common.Hash) {
