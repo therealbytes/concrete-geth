@@ -20,8 +20,11 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"golang.org/x/crypto/sha3"
+)
+
+var (
+	EmptyPreimageHash = Keccak256Hash(nil) // c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
 )
 
 var (
@@ -151,14 +154,14 @@ func (s *persistentStorage) AddPreimage(preimage []byte) {
 }
 
 func (s *persistentStorage) HasPreimage(hash common.Hash) bool {
-	if hash == types.EmptyPreimageHash {
+	if hash == EmptyPreimageHash {
 		return true
 	}
 	return s.db.GetPersistentState(HashRegistryAddress, hash) == common.BytesToHash(common.Big1.Bytes())
 }
 
 func (s *persistentStorage) GetPreimage(hash common.Hash) []byte {
-	if hash == types.EmptyPreimageHash {
+	if hash == EmptyPreimageHash {
 		return []byte{}
 	}
 	if !s.HasPreimage(hash) {
@@ -168,7 +171,7 @@ func (s *persistentStorage) GetPreimage(hash common.Hash) []byte {
 }
 
 func (s *persistentStorage) GetPreimageSize(hash common.Hash) int {
-	if hash == types.EmptyPreimageHash {
+	if hash == EmptyPreimageHash {
 		return 0
 	}
 	if !s.HasPreimage(hash) {
@@ -202,14 +205,14 @@ func (s *ephemeralStorage) AddPreimage(preimage []byte) {
 }
 
 func (s *ephemeralStorage) HasPreimage(hash common.Hash) bool {
-	if hash == types.EmptyPreimageHash {
+	if hash == EmptyPreimageHash {
 		return true
 	}
 	return s.db.GetEphemeralState(HashRegistryAddress, hash) == common.BytesToHash(common.Big1.Bytes())
 }
 
 func (s *ephemeralStorage) GetPreimage(hash common.Hash) []byte {
-	if hash == types.EmptyPreimageHash {
+	if hash == EmptyPreimageHash {
 		return []byte{}
 	}
 	if !s.HasPreimage(hash) {
@@ -219,7 +222,7 @@ func (s *ephemeralStorage) GetPreimage(hash common.Hash) []byte {
 }
 
 func (s *ephemeralStorage) GetPreimageSize(hash common.Hash) int {
-	if hash == types.EmptyPreimageHash {
+	if hash == EmptyPreimageHash {
 		return 0
 	}
 	if !s.HasPreimage(hash) {
