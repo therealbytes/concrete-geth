@@ -160,14 +160,14 @@ type StatefulWasmPrecompile struct {
 
 func statefulPrecompileWorker(ctx context.Context, code []byte, workerIn__Err chan *workerPayload__Err, workerIn_Bytes_BytesErr chan *workerPayload_Bytes_BytesErr, ready chan struct{}) {
 	var evm api.EVM
-	var stateDB api.StateDB
+	var statedb api.StateDB
 	var address common.Address
 
 	evmBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
 		return native.BridgeCallEVM(ctx, mod, pointer, evm)
 	}
 	stateDBBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
-		return native.BridgeCallStateDB(ctx, mod, pointer, stateDB)
+		return native.BridgeCallStateDB(ctx, mod, pointer, statedb)
 	}
 	addressBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
 		return native.BridgeAddress(ctx, mod, pointer, address)
@@ -188,7 +188,7 @@ func statefulPrecompileWorker(ctx context.Context, code []byte, workerIn__Err ch
 
 		case payload := <-workerIn__Err:
 			evm = payload.api.EVM()
-			stateDB = payload.api.StateDB()
+			statedb = payload.api.StateDB()
 			_retPointer, err := mod.ExportedFunction(*payload.funcName).Call(ctx)
 			if err != nil {
 				panic(err)
@@ -199,7 +199,7 @@ func statefulPrecompileWorker(ctx context.Context, code []byte, workerIn__Err ch
 
 		case payload := <-workerIn_Bytes_BytesErr:
 			evm = payload.api.EVM()
-			stateDB = payload.api.StateDB()
+			statedb = payload.api.StateDB()
 			pointer, err := native.WriteMemory(ctx, mod, payload.input)
 			if err != nil {
 				panic(err)

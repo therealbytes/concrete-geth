@@ -102,16 +102,16 @@ func (m *mockStateDB) GetEphemeralPreimageSize(hash common.Hash) int {
 var _ StateDB = &mockStateDB{}
 
 type mockEVM struct {
-	stateDB StateDB
+	db StateDB
 }
 
-func NewMockEVM(stateDB StateDB) EVM {
+func NewMockEVM(db StateDB) EVM {
 	return &mockEVM{
-		stateDB: stateDB,
+		db: db,
 	}
 }
 
-func (m *mockEVM) StateDB() StateDB                     { return m.stateDB }
+func (m *mockEVM) StateDB() StateDB                     { return m.db }
 func (m *mockEVM) BlockHash(block *big.Int) common.Hash { return common.Hash{} }
 func (m *mockEVM) BlockTimestamp() *big.Int             { return common.Big0 }
 func (m *mockEVM) BlockNumber() *big.Int                { return common.Big0 }

@@ -208,18 +208,18 @@ var _ api.StateDB = (*ProxyStateDB)(nil)
 
 type ProxyEVM struct {
 	Proxy
-	stateDB *ProxyStateDB
+	db *ProxyStateDB
 }
 
 func NewProxyEVM(memory Memory, evmBridge WasmBridgeFunc, stateDBBridge WasmBridgeFunc) *ProxyEVM {
 	return &ProxyEVM{
-		Proxy:   Proxy{memory: memory, bridgeFunc: evmBridge},
-		stateDB: NewProxyStateDB(memory, stateDBBridge),
+		Proxy: Proxy{memory: memory, bridgeFunc: evmBridge},
+		db:    NewProxyStateDB(memory, stateDBBridge),
 	}
 }
 
 func (p *ProxyEVM) StateDB() api.StateDB {
-	return p.stateDB
+	return p.db
 }
 
 func (p *ProxyEVM) BlockHash(block *big.Int) common.Hash {

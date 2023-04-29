@@ -25,12 +25,12 @@ import (
 )
 
 func NewTestStateDB() vm.StateDB {
-	stateDB, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-	return stateDB
+	db, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	return db
 }
 
-func NewTestEVMWithStateDB(stateDB vm.StateDB) api.EVM {
-	return vm.NewEVM(vm.BlockContext{}, vm.TxContext{}, stateDB, params.TestChainConfig, vm.Config{}).NewConcreteEVM()
+func NewTestEVMWithStateDB(db vm.StateDB) api.EVM {
+	return vm.NewEVM(vm.BlockContext{}, vm.TxContext{}, db, params.TestChainConfig, vm.Config{}).NewConcreteEVM()
 }
 
 func NewTestEVM() api.EVM {
