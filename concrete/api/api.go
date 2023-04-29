@@ -21,12 +21,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
 )
 
 var (
-	HashRegistryAddress = common.BytesToAddress(crypto.Keccak256([]byte("concrete.HashRegistry.v0")))
+	HashRegistryAddress = common.BytesToAddress(Keccak256([]byte("concrete.HashRegistry.v0")))
 )
 
 type StateDB interface {
@@ -360,6 +359,16 @@ type KeccakState interface {
 
 func NewKeccakState() KeccakState {
 	return sha3.NewLegacyKeccak256().(KeccakState)
+}
+
+func Keccak256(data ...[]byte) []byte {
+	b := make([]byte, 32)
+	d := NewKeccakState()
+	for _, b := range data {
+		d.Write(b)
+	}
+	d.Read(b)
+	return b
 }
 
 func Keccak256Hash(data ...[]byte) (h common.Hash) {
