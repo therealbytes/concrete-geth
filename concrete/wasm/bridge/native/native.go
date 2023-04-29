@@ -183,11 +183,11 @@ func BridgeCallStateDB(ctx context.Context, module wz_api.Module, pointer uint64
 	var opcode bridge.OpCode
 	opcode.Decode(args[0])
 	args = args[1:]
-	out := callStateDB(db, opcode, args)
+	out := CallStateDB(db, opcode, args)
 	return PutValue(ctx, module, out).Uint64()
 }
 
-func callStateDB(db api.StateDB, opcode bridge.OpCode, args [][]byte) []byte {
+func CallStateDB(db api.StateDB, opcode bridge.OpCode, args [][]byte) []byte {
 	switch opcode {
 	case bridge.Op_StateDB_GetPersistentState:
 		addr := common.BytesToAddress(args[0])
