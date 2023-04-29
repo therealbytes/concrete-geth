@@ -112,11 +112,11 @@ func NewMockEVM(stateDB StateDB) EVM {
 }
 
 func (m *mockEVM) StateDB() StateDB                     { return m.stateDB }
-func (m *mockEVM) BlockHash(block *big.Int) common.Hash { return common.BytesToHash([]byte{}) }
+func (m *mockEVM) BlockHash(block *big.Int) common.Hash { return common.Hash{} }
 func (m *mockEVM) BlockTimestamp() *big.Int             { return common.Big0 }
 func (m *mockEVM) BlockNumber() *big.Int                { return common.Big0 }
 func (m *mockEVM) BlockDifficulty() *big.Int            { return common.Big0 }
 func (m *mockEVM) BlockGasLimit() *big.Int              { return common.Big0 }
-func (m *mockEVM) BlockCoinbase() common.Address        { return common.BytesToAddress([]byte{}) }
+func (m *mockEVM) BlockCoinbase() common.Address        { return common.Address{} }
 
 var _ EVM = &mockEVM{}
