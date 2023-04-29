@@ -123,6 +123,7 @@ func (evm *commitSafeEVM) StateDB() StateDB {
 var _ EVM = &commitSafeEVM{}
 
 type Storage interface {
+	Address() common.Address
 	Set(key common.Hash, value common.Hash)
 	Get(key common.Hash) common.Hash
 	AddPreimage(preimage []byte)
@@ -134,6 +135,10 @@ type Storage interface {
 type persistentStorage struct {
 	address common.Address
 	db      StateDB
+}
+
+func (s *persistentStorage) Address() common.Address {
+	return s.address
 }
 
 func (s *persistentStorage) Set(key common.Hash, value common.Hash) {
@@ -185,6 +190,10 @@ var _ Storage = (*persistentStorage)(nil)
 type ephemeralStorage struct {
 	address common.Address
 	db      StateDB
+}
+
+func (s *ephemeralStorage) Address() common.Address {
+	return s.address
 }
 
 func (s *ephemeralStorage) Set(key common.Hash, value common.Hash) {
