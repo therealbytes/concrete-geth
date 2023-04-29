@@ -26,7 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
-	"github.com/ethereum/go-ethereum/concrete/contracts"
+	cc_contracts "github.com/ethereum/go-ethereum/concrete/contracts"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -393,8 +393,8 @@ func (s *StateDB) GetPersistentState(addr common.Address, key common.Hash) commo
 }
 
 func (s *StateDB) FinaliseConcretePrecompiles() {
-	for _, addr := range contracts.ActivePrecompiles() {
-		p, _ := contracts.GetPrecompile(addr)
+	for _, addr := range cc_contracts.ActivePrecompiles() {
+		p, _ := cc_contracts.GetPrecompile(addr)
 		api := cc_api.NewStateAPI(cc_api.NewCommitSafeStateDB(s), addr)
 		if err := p.Finalise(api); err != nil {
 			s.setError(fmt.Errorf("error in concrete precompile %x Finalise(): %v", addr, err))
@@ -403,8 +403,8 @@ func (s *StateDB) FinaliseConcretePrecompiles() {
 }
 
 func (s *StateDB) CommitConcretePrecompiles() {
-	for _, addr := range contracts.ActivePrecompiles() {
-		p, _ := contracts.GetPrecompile(addr)
+	for _, addr := range cc_contracts.ActivePrecompiles() {
+		p, _ := cc_contracts.GetPrecompile(addr)
 		api := cc_api.NewStateAPI(cc_api.NewCommitSafeStateDB(s), addr)
 		if err := p.Commit(api); err != nil {
 			s.setError(fmt.Errorf("error in concrete precompile %x Commit(): %v", addr, err))
@@ -1368,6 +1368,9 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 			// If it's a create-tx, the destination will be added inside evm.create
 		}
 		for _, addr := range precompiles {
+			al.AddAddress(addr)
+		}
+		for _, addr := range cc_contracts.ActivePrecompiles() {
 			al.AddAddress(addr)
 		}
 		for _, el := range list {
