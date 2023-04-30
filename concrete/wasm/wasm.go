@@ -40,11 +40,15 @@ var (
 	WASM_LOG_BRIDGE      = "concrete_LogBridge"
 )
 
-func NewWasmPrecompile(code []byte) api.Precompile {
+func NewWasmPrecompile(code []byte, address common.Address) api.Precompile {
 	ctx := context.Background()
 
+	addressBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
+		return native.BridgeAddress(ctx, mod, pointer, address)
+	}
+
 	// Create a stateless module for pure functions
-	mod, _, err := newModule(ctx, &bridgeConfig{}, code)
+	mod, _, err := newModule(ctx, &bridgeConfig{addressBridge: addressBridge}, code)
 	if err != nil {
 		panic(err)
 	}

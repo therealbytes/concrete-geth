@@ -29,9 +29,6 @@ import (
 //go:embed bin/blank.wasm
 var blankCode []byte
 
-//go:embed bin/log.wasm
-var logCode []byte
-
 func TestReadWriteMemory(t *testing.T) {
 	ctx := context.Background()
 	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)

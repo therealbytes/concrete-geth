@@ -17,22 +17,33 @@ package main
 
 import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
-	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/tinygo"
-	"github.com/ethereum/go-ethereum/tinygo/std"
 )
 
-type log struct {
-	lib.Blank
+type stub struct{}
+
+func (pc *stub) MutatesStorage(input []byte) bool {
+	return true
 }
 
-func (pc *log) Run(api cc_api.API, input []byte) ([]byte, error) {
-	std.Log(string(input))
-	return input, nil
+func (pc *stub) RequiredGas(input []byte) uint64 {
+	return 0
+}
+
+func (pc *stub) Finalise(api cc_api.API) error {
+	return nil
+}
+
+func (pc *stub) Commit(api cc_api.API) error {
+	return nil
+}
+
+func (pc *stub) Run(api cc_api.API, input []byte) ([]byte, error) {
+	return nil, nil
 }
 
 func init() {
-	tinygo.WasmWrap(&log{}, true)
+	tinygo.WasmWrap(&stub{}, true)
 }
 
 // main is REQUIRED for TinyGo to compile to Wasm

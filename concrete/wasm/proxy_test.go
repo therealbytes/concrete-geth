@@ -16,7 +16,6 @@
 package wasm
 
 import (
-	"context"
 	"math/big"
 	"testing"
 
@@ -27,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
 	"github.com/stretchr/testify/require"
-	wz_api "github.com/tetratelabs/wazero/api"
 )
 
 func newStateDBBridgeFunc(memory wasm.Memory, db cc_api.StateDB) wasm.WasmBridgeFunc {
@@ -160,35 +158,4 @@ func TestEVMBridge(t *testing.T) {
 	require.Equal(t, evm.BlockDifficulty(), proxy.BlockDifficulty())
 	require.Equal(t, evm.BlockGasLimit(), proxy.BlockGasLimit())
 	require.Equal(t, evm.BlockCoinbase(), proxy.BlockCoinbase())
-}
-
-func TestStatelessBridges(t *testing.T) {
-
-	address := common.HexToAddress("0x02")
-
-	var lastLog string
-	bridgeLog := func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-		msg := native.GetValue(ctx, module, bridge.MemPointer(pointer))
-		lastLog = string(msg)
-		return bridge.NullPointer.Uint64()
-	}
-	bridgeAddress := func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-		return native.PutValue(ctx, module, address.Bytes()).Uint64()
-	}
-
-	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{addressBridge: bridgeAddress, logBridge: bridgeLog}, logCode)
-	db := cc_api_test.NewMockStateDB()
-	evm := cc_api_test.NewMockEVM(db)
-	api := cc_api.New(evm, address)
-	pc := NewStatelessWasmPrecompile(mod)
-
-	// Test log
-	pc.Run(api, []byte("hello world"))
-	require.Equal(t, "hello world", lastLog)
-	pc.Run(api, []byte("bye world"))
-	require.Equal(t, "bye world", lastLog)
-
-	// Test address
-	// ...
 }
