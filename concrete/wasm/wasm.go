@@ -17,9 +17,10 @@ package wasm
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/concrete/api"
+	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/tetratelabs/wazero"
@@ -40,30 +41,13 @@ var (
 	WASM_LOG_BRIDGE      = "concrete_LogBridge"
 )
 
-func NewWasmPrecompile(code []byte, address common.Address) api.Precompile {
-	ctx := context.Background()
-
-	addressBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
-		return native.BridgeAddress(ctx, mod, pointer, address)
+func NewWasmPrecompile(code []byte, address common.Address) cc_api.Precompile {
+	pc := NewStatelessWasmPrecompile(code, address)
+	if pc.isPure() {
+		return pc
 	}
-
-	// Create a stateless module for pure functions
-	mod, _, err := newModule(ctx, &bridgeConfig{addressBridge: addressBridge}, code)
-	if err != nil {
-		panic(err)
-	}
-
-	_isPure, err := mod.ExportedFunction(WASM_IS_PURE).Call(ctx)
-	if err != nil {
-		panic(err)
-	}
-	isPure := _isPure[0] == 1
-
-	if isPure {
-		return NewStatelessWasmPrecompile(mod)
-	} else {
-		return NewStatefulWasmPrecompile(mod, code)
-	}
+	pc.close()
+	return NewStatefulWasmPrecompile(code)
 }
 
 type bridgeConfig struct {
@@ -73,7 +57,9 @@ type bridgeConfig struct {
 	logBridge     native.NativeBridgeFunc
 }
 
-func newModule(ctx context.Context, bridges *bridgeConfig, code []byte) (wz_api.Module, wazero.Runtime, error) {
+func newModule(bridges *bridgeConfig, code []byte) (wz_api.Module, wazero.Runtime, error) {
+
+	ctx := context.Background()
 
 	evmBridge := bridges.evmBridge
 	if evmBridge == nil {
@@ -110,18 +96,52 @@ func newModule(ctx context.Context, bridges *bridgeConfig, code []byte) (wz_api.
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return mod, r, nil
 }
 
-type StatelessWasmPrecompile struct {
-	mod wz_api.Module
+type mutexQueue struct {
+	mutex sync.Mutex
+	queue chan struct{}
 }
 
-func NewStatelessWasmPrecompile(mod wz_api.Module) *StatelessWasmPrecompile {
-	return &StatelessWasmPrecompile{mod}
+func newMutexQueue(capacity int) *mutexQueue {
+	return &mutexQueue{
+		queue: make(chan struct{}, capacity),
+	}
 }
 
-func (p *StatelessWasmPrecompile) statelessCall_Bytes_Uint64(funcName *string, input []byte) uint64 {
+func (m *mutexQueue) Lock() {
+	m.queue <- struct{}{}
+	m.mutex.Lock()
+}
+
+func (m *mutexQueue) Unlock() {
+	m.mutex.Unlock()
+	<-m.queue
+}
+
+type wasmPrecompile struct {
+	r     wazero.Runtime
+	mod   wz_api.Module
+	mutex *mutexQueue
+}
+
+func (p *wasmPrecompile) close() {
+	ctx := context.Background()
+	p.r.Close(ctx)
+}
+
+func (p *wasmPrecompile) call__Uint64(funcName *string) uint64 {
+	ctx := context.Background()
+	_ret, err := p.mod.ExportedFunction(*funcName).Call(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return _ret[0]
+}
+
+func (p *wasmPrecompile) call_Bytes_Uint64(funcName *string, input []byte) uint64 {
 	ctx := context.Background()
 	pointer, err := native.WriteMemory(ctx, p.mod, input)
 	if err != nil {
@@ -135,74 +155,97 @@ func (p *StatelessWasmPrecompile) statelessCall_Bytes_Uint64(funcName *string, i
 	return _ret[0]
 }
 
-func (p *StatelessWasmPrecompile) statelessCall_Bytes_BytesErr(funcName *string, input []byte) ([]byte, error) {
+func (p *wasmPrecompile) call_Bytes_BytesErr(funcName *string, input []byte) ([]byte, error) {
 	ctx := context.Background()
-	_retPointer := p.statelessCall_Bytes_Uint64(funcName, input)
+	_retPointer := p.call_Bytes_Uint64(funcName, input)
 	retPointer := bridge.MemPointer(_retPointer)
 	retValues, retErr := native.GetReturnWithError(ctx, p.mod, retPointer)
 	return retValues[0], retErr
 }
 
-func (p *StatelessWasmPrecompile) MutatesStorage(input []byte) bool {
+func (p *wasmPrecompile) call__Err(funcName *string) error {
+	ctx := context.Background()
+	_retPointer, err := p.mod.ExportedFunction(*funcName).Call(ctx)
+	if err != nil {
+		panic(err)
+	}
+	retPointer := bridge.MemPointer(_retPointer[0])
+	_, retErr := native.GetReturnWithError(ctx, p.mod, retPointer)
+	return retErr
+}
+
+func (p *wasmPrecompile) before(api cc_api.API) {
+	p.mutex.Lock()
+}
+
+func (p *wasmPrecompile) after(api cc_api.API) {
+	p.mutex.Unlock()
+}
+
+type statelessWasmPrecompile struct {
+	wasmPrecompile
+}
+
+func NewStatelessWasmPrecompile(code []byte, address common.Address) *statelessWasmPrecompile {
+	addressBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
+		return native.BridgeAddress(ctx, mod, pointer, address)
+	}
+	mod, r, err := newModule(&bridgeConfig{addressBridge: addressBridge}, code)
+	if err != nil {
+		panic(err)
+	}
+	mutex := newMutexQueue(16)
+	return &statelessWasmPrecompile{wasmPrecompile{r: r, mod: mod, mutex: mutex}}
+}
+
+func (p *wasmPrecompile) isPure() bool {
+	p.before(nil)
+	defer p.after(nil)
+	return p.call__Uint64(&WASM_IS_PURE) != 0
+}
+
+func (p *wasmPrecompile) MutatesStorage(input []byte) bool {
 	return false
 }
 
-func (p *StatelessWasmPrecompile) RequiredGas(input []byte) uint64 {
-	return p.statelessCall_Bytes_Uint64(&WASM_REQUIRED_GAS, input)
+func (p *wasmPrecompile) RequiredGas(input []byte) uint64 {
+	p.before(nil)
+	defer p.after(nil)
+	return p.call_Bytes_Uint64(&WASM_REQUIRED_GAS, input)
 }
 
-func (p *StatelessWasmPrecompile) Finalise(api api.API) error {
+func (p *wasmPrecompile) Finalise(api cc_api.API) error {
 	return nil
 }
 
-func (p *StatelessWasmPrecompile) Commit(api api.API) error {
+func (p *wasmPrecompile) Commit(api cc_api.API) error {
 	return nil
 }
 
-func (p *StatelessWasmPrecompile) Run(api api.API, input []byte) ([]byte, error) {
-	return p.statelessCall_Bytes_BytesErr(&WASM_RUN, input)
+func (p *wasmPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
+	p.before(api)
+	defer p.after(api)
+	return p.call_Bytes_BytesErr(&WASM_RUN, input)
 }
 
-type workerPayload struct {
-	funcName *string
-	api      api.API
+var _ cc_api.Precompile = (*statelessWasmPrecompile)(nil)
+
+type statefulWasmPrecompile struct {
+	wasmPrecompile
+	api cc_api.API
 }
 
-type workerPayload__Err struct {
-	workerPayload
-	out chan error
-}
-
-type workerResponse_BytesErr struct {
-	data []byte
-	err  error
-}
-
-type workerPayload_Bytes_BytesErr struct {
-	workerPayload
-	input []byte
-	out   chan *workerResponse_BytesErr
-}
-
-type StatefulWasmPrecompile struct {
-	StatelessWasmPrecompile
-	workerIn__Err           chan *workerPayload__Err
-	workerIn_Bytes_BytesErr chan *workerPayload_Bytes_BytesErr
-}
-
-func statefulPrecompileWorker(ctx context.Context, code []byte, workerIn__Err chan *workerPayload__Err, workerIn_Bytes_BytesErr chan *workerPayload_Bytes_BytesErr, ready chan struct{}) {
-	var evm api.EVM
-	var statedb api.StateDB
-	var address common.Address
+func NewStatefulWasmPrecompile(code []byte) *statefulWasmPrecompile {
+	pc := &statefulWasmPrecompile{}
 
 	evmBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
-		return native.BridgeCallEVM(ctx, mod, pointer, evm)
+		return native.BridgeCallEVM(ctx, mod, pointer, pc.api.EVM())
 	}
 	stateDBBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
-		return native.BridgeCallStateDB(ctx, mod, pointer, statedb)
+		return native.BridgeCallStateDB(ctx, mod, pointer, pc.api.StateDB())
 	}
 	addressBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
-		return native.BridgeAddress(ctx, mod, pointer, address)
+		return native.BridgeAddress(ctx, mod, pointer, pc.api.Address())
 	}
 
 	bridges := &bridgeConfig{
@@ -211,90 +254,50 @@ func statefulPrecompileWorker(ctx context.Context, code []byte, workerIn__Err ch
 		addressBridge: addressBridge,
 	}
 
-	mod, r, err := newModule(ctx, bridges, code)
+	mod, r, err := newModule(bridges, code)
 	if err != nil {
 		panic(err)
 	}
-	defer r.Close(ctx)
 
-	ready <- struct{}{}
+	pc.r = r
+	pc.mod = mod
+	pc.mutex = newMutexQueue(16)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case payload := <-workerIn__Err:
-			evm = payload.api.EVM()
-			statedb = payload.api.StateDB()
-			_retPointer, err := mod.ExportedFunction(*payload.funcName).Call(ctx)
-			if err != nil {
-				panic(err)
-			}
-			retPointer := bridge.MemPointer(_retPointer[0])
-			_, retErr := native.GetReturnWithError(ctx, mod, retPointer)
-			payload.out <- retErr
-
-		case payload := <-workerIn_Bytes_BytesErr:
-			evm = payload.api.EVM()
-			statedb = payload.api.StateDB()
-			pointer, err := native.WriteMemory(ctx, mod, payload.input)
-			if err != nil {
-				panic(err)
-			}
-			_retPointer, err := mod.ExportedFunction(*payload.funcName).Call(ctx, pointer.Uint64())
-			if err != nil {
-				panic(err)
-			}
-			retPointer := bridge.MemPointer(_retPointer[0])
-			retValues, retErr := native.GetReturnWithError(ctx, mod, retPointer)
-			payload.out <- &workerResponse_BytesErr{retValues[0], retErr}
-		}
-
-		native.PruneMemory(ctx, mod)
-	}
+	return pc
 }
 
-func NewStatefulWasmPrecompile(mod wz_api.Module, code []byte) *StatefulWasmPrecompile {
-	ctx := context.Background()
-	workerIn__Err := make(chan *workerPayload__Err, 8)
-	workerIn_Bytes_BytesErr := make(chan *workerPayload_Bytes_BytesErr, 8)
-	ready := make(chan struct{})
-	go statefulPrecompileWorker(ctx, code, workerIn__Err, workerIn_Bytes_BytesErr, ready)
-	<-ready
-	return &StatefulWasmPrecompile{
-		StatelessWasmPrecompile: StatelessWasmPrecompile{mod},
-		workerIn__Err:           workerIn__Err,
-		workerIn_Bytes_BytesErr: workerIn_Bytes_BytesErr,
-	}
+func (p *statefulWasmPrecompile) before(api cc_api.API) {
+	p.mutex.Lock()
+	p.api = api
 }
 
-func (p *StatefulWasmPrecompile) statefulCall__Err(api api.API, funcName *string) error {
-	out := make(chan error)
-	p.workerIn__Err <- &workerPayload__Err{workerPayload{funcName, api}, out}
-	return <-out
+func (p *statefulWasmPrecompile) after(api cc_api.API) {
+	p.mutex.Unlock()
+	p.api = nil
 }
 
-func (p *StatefulWasmPrecompile) statefulCall_Bytes_BytesErr(api api.API, funcName *string, input []byte) ([]byte, error) {
-	out := make(chan *workerResponse_BytesErr)
-	p.workerIn_Bytes_BytesErr <- &workerPayload_Bytes_BytesErr{workerPayload{funcName, api}, input, out}
-	resp := <-out
-	return resp.data, resp.err
+func (p *statefulWasmPrecompile) MutatesStorage(input []byte) bool {
+	p.before(nil)
+	defer p.after(nil)
+	return p.call_Bytes_Uint64(&WASM_MUTATES_STORAGE, input) != 0
 }
 
-func (p *StatefulWasmPrecompile) MutatesStorage(input []byte) bool {
-	_mutates := p.statelessCall_Bytes_Uint64(&WASM_MUTATES_STORAGE, input)
-	return _mutates != 0
+func (p *statefulWasmPrecompile) Finalise(api cc_api.API) error {
+	p.before(api)
+	defer p.after(api)
+	return p.call__Err(&WASM_FINALISE)
 }
 
-func (p *StatefulWasmPrecompile) Finalise(api api.API) error {
-	return p.statefulCall__Err(api, &WASM_FINALISE)
+func (p *statefulWasmPrecompile) Commit(api cc_api.API) error {
+	p.before(api)
+	defer p.after(api)
+	return p.call__Err(&WASM_COMMIT)
 }
 
-func (p *StatefulWasmPrecompile) Commit(api api.API) error {
-	return p.statefulCall__Err(api, &WASM_COMMIT)
+func (p *statefulWasmPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
+	p.before(api)
+	defer p.after(api)
+	return p.call_Bytes_BytesErr(&WASM_RUN, input)
 }
 
-func (p *StatefulWasmPrecompile) Run(api api.API, input []byte) ([]byte, error) {
-	return p.statefulCall_Bytes_BytesErr(api, &WASM_RUN, input)
-}
+var _ cc_api.Precompile = (*statefulWasmPrecompile)(nil)
