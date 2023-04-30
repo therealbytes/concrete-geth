@@ -21,7 +21,7 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/concrete/api"
+	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
 )
@@ -29,10 +29,10 @@ import (
 // Note: This uses a uint64 instead of two result values for compatibility with
 // WebAssembly 1.0.
 
-var precompile api.Precompile
+var precompile cc_api.Precompile
 var precompileIsPure bool
 
-func WasmWrap(pc api.Precompile, isPure bool) {
+func WasmWrap(pc cc_api.Precompile, isPure bool) {
 	precompile = pc
 	precompileIsPure = isPure
 }
@@ -129,14 +129,15 @@ func AddressBridge() common.Address {
 	return common.BytesToAddress(Memory.Deref(bridge.MemPointer(pointer)))
 }
 
-func NewAPI() api.API {
+func NewAPI() cc_api.API {
 	evm := wasm.NewProxyEVM(Memory, EvmBridge, StateDBBridge)
-	return api.New(evm, AddressBridge())
+	return cc_api.New(evm, AddressBridge())
 }
 
-func NewStateAPI() api.API {
+func NewStateAPI() cc_api.API {
 	statedb := wasm.NewProxyStateDB(Memory, StateDBBridge)
-	return api.NewStateAPI(statedb, AddressBridge())
+	address := AddressBridge()
+	return cc_api.NewStateAPI(cc_api.NewCommitSafeStateDB(statedb), address)
 }
 
 //export concrete_IsPure

@@ -291,6 +291,11 @@ func BridgeAddress(ctx context.Context, module wz_api.Module, pointer uint64, ad
 	return PutValue(ctx, module, addr.Bytes()).Uint64()
 }
 
+func BridgeAddress0(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+	addr := common.Address{}
+	return PutValue(ctx, module, addr.Bytes()).Uint64()
+}
+
 func BridgeLog(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
 	msg := GetValue(ctx, module, bridge.MemPointer(pointer))
 	log.Debug("wasm:", string(msg))

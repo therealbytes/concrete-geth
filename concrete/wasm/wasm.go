@@ -44,7 +44,7 @@ func NewWasmPrecompile(code []byte) api.Precompile {
 	ctx := context.Background()
 
 	// Create a stateless module for pure functions
-	mod, _, err := newModule(ctx, native.DisabledBridge, native.DisabledBridge, native.DisabledBridge, code)
+	mod, _, err := newModule(ctx, &bridgeConfig{}, code)
 	if err != nil {
 		panic(err)
 	}
@@ -62,13 +62,41 @@ func NewWasmPrecompile(code []byte) api.Precompile {
 	}
 }
 
-func newModule(ctx context.Context, evmBridge native.NativeBridgeFunc, stateDBBridge native.NativeBridgeFunc, addressBridge native.NativeBridgeFunc, code []byte) (wz_api.Module, wazero.Runtime, error) {
+type bridgeConfig struct {
+	evmBridge     native.NativeBridgeFunc
+	stateDBBridge native.NativeBridgeFunc
+	addressBridge native.NativeBridgeFunc
+	logBridge     native.NativeBridgeFunc
+}
+
+func newModule(ctx context.Context, bridges *bridgeConfig, code []byte) (wz_api.Module, wazero.Runtime, error) {
+
+	evmBridge := bridges.evmBridge
+	if evmBridge == nil {
+		evmBridge = native.DisabledBridge
+	}
+
+	stateDBBridge := bridges.stateDBBridge
+	if stateDBBridge == nil {
+		stateDBBridge = native.DisabledBridge
+	}
+
+	addressBridge := bridges.addressBridge
+	if addressBridge == nil {
+		addressBridge = native.BridgeAddress0
+	}
+
+	logBridge := bridges.logBridge
+	if logBridge == nil {
+		logBridge = native.BridgeLog
+	}
+
 	r := wazero.NewRuntime(ctx)
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(evmBridge).Export(WASM_EVM_BRIDGE).
 		NewFunctionBuilder().WithFunc(stateDBBridge).Export(WASM_STATEDB_BRIDGE).
 		NewFunctionBuilder().WithFunc(addressBridge).Export(WASM_ADDRESS_BRIDGE).
-		NewFunctionBuilder().WithFunc(native.BridgeLog).Export(WASM_LOG_BRIDGE).
+		NewFunctionBuilder().WithFunc(logBridge).Export(WASM_LOG_BRIDGE).
 		Instantiate(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -173,7 +201,13 @@ func statefulPrecompileWorker(ctx context.Context, code []byte, workerIn__Err ch
 		return native.BridgeAddress(ctx, mod, pointer, address)
 	}
 
-	mod, r, err := newModule(ctx, evmBridge, stateDBBridge, addressBridge, code)
+	bridges := &bridgeConfig{
+		evmBridge:     evmBridge,
+		stateDBBridge: stateDBBridge,
+		addressBridge: addressBridge,
+	}
+
+	mod, r, err := newModule(ctx, bridges, code)
 	if err != nil {
 		panic(err)
 	}

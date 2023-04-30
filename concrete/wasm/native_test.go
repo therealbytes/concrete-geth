@@ -24,20 +24,17 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/stretchr/testify/require"
-	"github.com/tetratelabs/wazero/api"
 )
 
 //go:embed bin/blank.wasm
-var code []byte
+var blankCode []byte
 
-func new1DBridgeModule() api.Module {
-	mod, _, _ := newModule(context.Background(), native.DisabledBridge, native.DisabledBridge, native.DisabledBridge, code)
-	return mod
-}
+//go:embed bin/log.wasm
+var logCode []byte
 
 func TestReadWriteMemory(t *testing.T) {
-	mod := new1DBridgeModule()
 	ctx := context.Background()
+	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
 
 	data := []byte{1, 2, 3, 4, 5}
 	ptr, err := native.WriteMemory(ctx, mod, data)
@@ -50,8 +47,8 @@ func TestReadWriteMemory(t *testing.T) {
 }
 
 func TestFreeMemory(t *testing.T) {
-	mod := new1DBridgeModule()
 	ctx := context.Background()
+	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
 
 	data := []byte{1, 2, 3, 4, 5}
 
@@ -65,8 +62,8 @@ func TestFreeMemory(t *testing.T) {
 }
 
 func TestPruneMemory(t *testing.T) {
-	mod := new1DBridgeModule()
 	ctx := context.Background()
+	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
 
 	data := []byte{1, 2, 3, 4, 5}
 
@@ -84,8 +81,8 @@ func TestPruneMemory(t *testing.T) {
 }
 
 func TestPutGetValues(t *testing.T) {
-	mod := new1DBridgeModule()
 	ctx := context.Background()
+	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
 
 	// Test PutValue and GetValue
 	value := []byte{0x01, 0x02, 0x03}
@@ -111,8 +108,8 @@ func TestPutGetValues(t *testing.T) {
 }
 
 func TestPutGetArgs(t *testing.T) {
-	mod := new1DBridgeModule()
 	ctx := context.Background()
+	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
 
 	// Test PutArgs and GetArgs
 	args := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
@@ -131,8 +128,8 @@ func TestPutGetArgs(t *testing.T) {
 }
 
 func TestPutGetReturn(t *testing.T) {
-	mod := new1DBridgeModule()
 	ctx := context.Background()
+	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
 
 	// Test PutReturn and GetReturn
 	retValues := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
@@ -151,8 +148,8 @@ func TestPutGetReturn(t *testing.T) {
 }
 
 func TestPutGetReturnWithError(t *testing.T) {
-	mod := new1DBridgeModule()
 	ctx := context.Background()
+	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
 
 	// Test with success
 	retValues := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}

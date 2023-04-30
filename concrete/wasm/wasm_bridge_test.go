@@ -16,19 +16,21 @@
 package wasm
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/concrete/api"
+	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	cc_api_test "github.com/ethereum/go-ethereum/concrete/api/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
 	"github.com/stretchr/testify/require"
+	wz_api "github.com/tetratelabs/wazero/api"
 )
 
-func newStateDBBridgeFunc(memory wasm.Memory, db api.StateDB) wasm.WasmBridgeFunc {
+func newStateDBBridgeFunc(memory wasm.Memory, db cc_api.StateDB) wasm.WasmBridgeFunc {
 	return func(pointer uint64) uint64 {
 		args := wasm.GetArgs(memory, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
@@ -39,17 +41,17 @@ func newStateDBBridgeFunc(memory wasm.Memory, db api.StateDB) wasm.WasmBridgeFun
 	}
 }
 
-func newProxyStateDB(db api.StateDB) api.StateDB {
+func newProxyStateDB(db cc_api.StateDB) cc_api.StateDB {
 	mem := wasm.NewMockMemory()
 	bridgeFunc := newStateDBBridgeFunc(mem, db)
 	return wasm.NewProxyStateDB(mem, bridgeFunc)
 }
 
 type readWriteStorage struct {
-	read, write api.Storage
+	read, write cc_api.Storage
 }
 
-func NewReadWriteStorage(read, write api.Storage) api.Storage {
+func NewReadWriteStorage(read, write cc_api.Storage) cc_api.Storage {
 	return &readWriteStorage{
 		read:  read,
 		write: write,
@@ -88,8 +90,8 @@ func TestStateDBBProxy(t *testing.T) {
 	address := common.HexToAddress("0x01")
 	statedb := cc_api_test.NewMockStateDB()
 	proxy := newProxyStateDB(statedb)
-	stateApi := api.NewStateAPI(statedb, address)
-	proxyStateApi := api.NewStateAPI(proxy, address)
+	stateApi := cc_api.NewStateAPI(statedb, address)
+	proxyStateApi := cc_api.NewStateAPI(proxy, address)
 
 	persistent := stateApi.Persistent()
 	proxyPersistent := proxyStateApi.Persistent()
@@ -110,16 +112,16 @@ func TestStateDBBProxy(t *testing.T) {
 }
 
 type mockEVM struct {
-	db api.StateDB
+	db cc_api.StateDB
 }
 
-func newEVMStub(db api.StateDB) api.EVM {
+func newEVMStub(db cc_api.StateDB) cc_api.EVM {
 	return &mockEVM{
 		db: db,
 	}
 }
 
-func (m *mockEVM) StateDB() api.StateDB                 { return m.db }
+func (m *mockEVM) StateDB() cc_api.StateDB              { return m.db }
 func (m *mockEVM) BlockHash(block *big.Int) common.Hash { return common.Hash{2} }
 func (m *mockEVM) BlockTimestamp() *big.Int             { return common.Big2 }
 func (m *mockEVM) BlockNumber() *big.Int                { return common.Big2 }
@@ -127,9 +129,9 @@ func (m *mockEVM) BlockDifficulty() *big.Int            { return common.Big2 }
 func (m *mockEVM) BlockGasLimit() *big.Int              { return common.Big2 }
 func (m *mockEVM) BlockCoinbase() common.Address        { return common.Address{2} }
 
-var _ api.EVM = &mockEVM{}
+var _ cc_api.EVM = &mockEVM{}
 
-func newEVMBridgeFunc(memory wasm.Memory, evm api.EVM) wasm.WasmBridgeFunc {
+func newEVMBridgeFunc(memory wasm.Memory, evm cc_api.EVM) wasm.WasmBridgeFunc {
 	return func(pointer uint64) uint64 {
 		args := wasm.GetArgs(memory, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
@@ -140,7 +142,7 @@ func newEVMBridgeFunc(memory wasm.Memory, evm api.EVM) wasm.WasmBridgeFunc {
 	}
 }
 
-func newProxyEVM(evm api.EVM) api.EVM {
+func newProxyEVM(evm cc_api.EVM) cc_api.EVM {
 	mem := wasm.NewMockMemory()
 	stateDBBridgeFunc := newStateDBBridgeFunc(mem, evm.StateDB())
 	evmBridgeFunc := newEVMBridgeFunc(mem, evm)
@@ -158,4 +160,35 @@ func TestEVMBridge(t *testing.T) {
 	require.Equal(t, evm.BlockDifficulty(), proxy.BlockDifficulty())
 	require.Equal(t, evm.BlockGasLimit(), proxy.BlockGasLimit())
 	require.Equal(t, evm.BlockCoinbase(), proxy.BlockCoinbase())
+}
+
+func TestStatelessBridges(t *testing.T) {
+
+	address := common.HexToAddress("0x02")
+
+	var lastLog string
+	bridgeLog := func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+		msg := native.GetValue(ctx, module, bridge.MemPointer(pointer))
+		lastLog = string(msg)
+		return bridge.NullPointer.Uint64()
+	}
+	bridgeAddress := func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+		return native.PutValue(ctx, module, address.Bytes()).Uint64()
+	}
+
+	ctx := context.Background()
+	mod, _, _ := newModule(ctx, &bridgeConfig{addressBridge: bridgeAddress, logBridge: bridgeLog}, logCode)
+	db := cc_api_test.NewMockStateDB()
+	evm := cc_api_test.NewMockEVM(db)
+	api := cc_api.New(evm, address)
+	pc := NewStatelessWasmPrecompile(mod)
+
+	// Test log
+	pc.Run(api, []byte("hello world"))
+	require.Equal(t, "hello world", lastLog)
+	pc.Run(api, []byte("bye world"))
+	require.Equal(t, "bye world", lastLog)
+
+	// Test address
+	// ...
 }
