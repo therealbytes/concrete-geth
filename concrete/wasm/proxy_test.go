@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	cc_api_test "github.com/ethereum/go-ethereum/concrete/api/test"
+	cc_test "github.com/ethereum/go-ethereum/concrete/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
@@ -86,7 +87,7 @@ func (s *readWriteStorage) GetPreimageSize(hash common.Hash) int {
 
 func TestStateDBBProxy(t *testing.T) {
 	address := common.HexToAddress("0x01")
-	statedb := cc_api_test.NewMockStateDB()
+	statedb := cc_test.NewTestStateDB()
 	proxy := newProxyStateDB(statedb)
 	stateApi := cc_api.NewStateAPI(statedb, address)
 	proxyStateApi := cc_api.NewStateAPI(proxy, address)
