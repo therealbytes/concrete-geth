@@ -13,23 +13,24 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package api
+package test
 
 import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/concrete/api"
 )
 
-type mockStateDB struct {
+type MockStateDB struct {
 	persistentState     map[common.Address]map[common.Hash]common.Hash
 	ephemeralState      map[common.Address]map[common.Hash]common.Hash
 	persistentPreimages map[common.Hash][]byte
 	ephemeralPreimages  map[common.Hash][]byte
 }
 
-func NewMockStateDB() StateDB {
-	return &mockStateDB{
+func NewMockStateDB() api.StateDB {
+	return &MockStateDB{
 		persistentState:     make(map[common.Address]map[common.Hash]common.Hash),
 		ephemeralState:      make(map[common.Address]map[common.Hash]common.Hash),
 		persistentPreimages: make(map[common.Hash][]byte),
@@ -37,81 +38,81 @@ func NewMockStateDB() StateDB {
 	}
 }
 
-func (m *mockStateDB) SetPersistentState(addr common.Address, key, value common.Hash) {
+func (m *MockStateDB) SetPersistentState(addr common.Address, key, value common.Hash) {
 	if _, ok := m.persistentState[addr]; !ok {
 		m.persistentState[addr] = make(map[common.Hash]common.Hash)
 	}
 	m.persistentState[addr][key] = value
 }
 
-func (m *mockStateDB) GetPersistentState(addr common.Address, key common.Hash) common.Hash {
+func (m *MockStateDB) GetPersistentState(addr common.Address, key common.Hash) common.Hash {
 	if _, ok := m.persistentState[addr]; !ok {
 		return common.Hash{}
 	}
 	return m.persistentState[addr][key]
 }
 
-func (m *mockStateDB) SetEphemeralState(addr common.Address, key, value common.Hash) {
+func (m *MockStateDB) SetEphemeralState(addr common.Address, key, value common.Hash) {
 	if _, ok := m.ephemeralState[addr]; !ok {
 		m.ephemeralState[addr] = make(map[common.Hash]common.Hash)
 	}
 	m.ephemeralState[addr][key] = value
 }
 
-func (m *mockStateDB) GetEphemeralState(addr common.Address, key common.Hash) common.Hash {
+func (m *MockStateDB) GetEphemeralState(addr common.Address, key common.Hash) common.Hash {
 	if _, ok := m.ephemeralState[addr]; !ok {
 		return common.Hash{}
 	}
 	return m.ephemeralState[addr][key]
 }
 
-func (m *mockStateDB) AddPersistentPreimage(hash common.Hash, preimage []byte) {
+func (m *MockStateDB) AddPersistentPreimage(hash common.Hash, preimage []byte) {
 	pi := make([]byte, len(preimage))
 	copy(pi, preimage)
 	m.persistentPreimages[hash] = pi
 }
 
-func (m *mockStateDB) GetPersistentPreimage(hash common.Hash) []byte {
+func (m *MockStateDB) GetPersistentPreimage(hash common.Hash) []byte {
 	if pi, ok := m.persistentPreimages[hash]; ok {
 		return pi
 	}
 	return []byte{}
 }
 
-func (m *mockStateDB) GetPersistentPreimageSize(hash common.Hash) int {
+func (m *MockStateDB) GetPersistentPreimageSize(hash common.Hash) int {
 	return len(m.persistentPreimages[hash])
 }
 
-func (m *mockStateDB) AddEphemeralPreimage(hash common.Hash, preimage []byte) {
+func (m *MockStateDB) AddEphemeralPreimage(hash common.Hash, preimage []byte) {
 	pi := make([]byte, len(preimage))
 	copy(pi, preimage)
 	m.ephemeralPreimages[hash] = pi
 }
 
-func (m *mockStateDB) GetEphemeralPreimage(hash common.Hash) []byte {
+func (m *MockStateDB) GetEphemeralPreimage(hash common.Hash) []byte {
 	if pi, ok := m.ephemeralPreimages[hash]; ok {
 		return pi
 	}
 	return []byte{}
 }
 
-func (m *mockStateDB) GetEphemeralPreimageSize(hash common.Hash) int {
+func (m *MockStateDB) GetEphemeralPreimageSize(hash common.Hash) int {
 	return len(m.ephemeralPreimages[hash])
 }
 
-var _ StateDB = &mockStateDB{}
+var _ api.StateDB = &MockStateDB{}
 
 type mockEVM struct {
-	db StateDB
+	db api.StateDB
 }
 
-func NewMockEVM(db StateDB) EVM {
+func NewMockEVM(db api.StateDB) api.EVM {
 	return &mockEVM{
 		db: db,
 	}
 }
 
-func (m *mockEVM) StateDB() StateDB                     { return m.db }
+func (m *mockEVM) StateDB() api.StateDB                 { return m.db }
 func (m *mockEVM) BlockHash(block *big.Int) common.Hash { return common.Hash{} }
 func (m *mockEVM) BlockTimestamp() *big.Int             { return common.Big0 }
 func (m *mockEVM) BlockNumber() *big.Int                { return common.Big0 }
@@ -119,4 +120,4 @@ func (m *mockEVM) BlockDifficulty() *big.Int            { return common.Big0 }
 func (m *mockEVM) BlockGasLimit() *big.Int              { return common.Big0 }
 func (m *mockEVM) BlockCoinbase() common.Address        { return common.Address{} }
 
-var _ EVM = &mockEVM{}
+var _ api.EVM = &mockEVM{}

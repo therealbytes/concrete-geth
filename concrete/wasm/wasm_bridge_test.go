@@ -21,6 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
+	cc_api_test "github.com/ethereum/go-ethereum/concrete/api/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
@@ -85,7 +86,7 @@ func (s *readWriteStorage) GetPreimageSize(hash common.Hash) int {
 
 func TestStateDBBProxy(t *testing.T) {
 	address := common.HexToAddress("0x01")
-	statedb := api.NewMockStateDB()
+	statedb := cc_api_test.NewMockStateDB()
 	proxy := newProxyStateDB(statedb)
 	stateApi := api.NewStateAPI(statedb, address)
 	proxyStateApi := api.NewStateAPI(proxy, address)
@@ -96,16 +97,16 @@ func TestStateDBBProxy(t *testing.T) {
 	proxyEphemeral := proxyStateApi.Ephemeral()
 
 	// Test persistent methods
-	api.TestStorage(t, NewReadWriteStorage(persistent, proxyPersistent))
-	api.TestStorage(t, NewReadWriteStorage(proxyPersistent, persistent))
+	cc_api_test.TestStorage(t, NewReadWriteStorage(persistent, proxyPersistent))
+	cc_api_test.TestStorage(t, NewReadWriteStorage(proxyPersistent, persistent))
 
 	// Test ephemeral methods
-	api.TestStorage(t, NewReadWriteStorage(ephemeral, proxyEphemeral))
-	api.TestStorage(t, NewReadWriteStorage(proxyEphemeral, ephemeral))
+	cc_api_test.TestStorage(t, NewReadWriteStorage(ephemeral, proxyEphemeral))
+	cc_api_test.TestStorage(t, NewReadWriteStorage(proxyEphemeral, ephemeral))
 
 	// Fuzz proxy
-	api.FuzzStorage(t, proxyPersistent)
-	api.FuzzStorage(t, proxyEphemeral)
+	cc_api_test.FuzzStorage(t, proxyPersistent)
+	cc_api_test.FuzzStorage(t, proxyEphemeral)
 }
 
 type mockEVM struct {
@@ -147,7 +148,7 @@ func newProxyEVM(evm api.EVM) api.EVM {
 }
 
 func TestEVMBridge(t *testing.T) {
-	db := api.NewMockStateDB()
+	db := cc_api_test.NewMockStateDB()
 	evm := newEVMStub(db)
 	proxy := newProxyEVM(evm)
 

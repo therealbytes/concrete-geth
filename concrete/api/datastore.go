@@ -29,39 +29,39 @@ type Datastore interface {
 	NewSet(id common.Hash) Set
 }
 
-type datastore struct {
+type CoreDatastore struct {
 	Storage
 }
 
-func (d *datastore) NewReference(key common.Hash) Reference {
+func (d *CoreDatastore) NewReference(key common.Hash) Reference {
 	return &reference{
 		ds:  d,
 		key: key,
 	}
 }
 
-func (d *datastore) NewMap(id common.Hash) Mapping {
+func (d *CoreDatastore) NewMap(id common.Hash) Mapping {
 	return &mapping{
 		ds: d,
 		id: id,
 	}
 }
 
-func (d *datastore) NewArray(id common.Hash) Array {
+func (d *CoreDatastore) NewArray(id common.Hash) Array {
 	return &array{
 		ds: d,
 		id: id,
 	}
 }
 
-func (d *datastore) NewSet(id common.Hash) Set {
+func (d *CoreDatastore) NewSet(id common.Hash) Set {
 	return &set{
 		ds: d,
 		id: id,
 	}
 }
 
-var _ Datastore = (*datastore)(nil)
+var _ Datastore = (*CoreDatastore)(nil)
 
 // Reference
 
@@ -241,8 +241,8 @@ type Set interface {
 }
 
 type set struct {
+	ds Datastore
 	id common.Hash
-	ds *datastore
 }
 
 func (s *set) indexMap() Mapping {

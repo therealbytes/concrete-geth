@@ -13,22 +13,20 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package api
+package test
 
 import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/stretchr/testify/require"
 )
 
-func newDatastore() Datastore {
+func newDatastore() api.Datastore {
 	address := common.HexToAddress("0x01")
 	db := NewMockStateDB()
-	return &datastore{&persistentStorage{
-		address: address,
-		db:      db,
-	}}
+	return api.NewCoreDatastore(api.NewPersistentStorage(db, address))
 }
 
 func TestDatastore(t *testing.T) {

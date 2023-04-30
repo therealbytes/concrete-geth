@@ -44,45 +44,45 @@ type StateDB interface {
 	GetEphemeralPreimageSize(hash common.Hash) int
 }
 
-type readOnlyStateDB struct {
+type ReadOnlyStateDB struct {
 	StateDB
 }
 
 func NewReadOnlyStateDB(db StateDB) StateDB {
-	return &readOnlyStateDB{db}
+	return &ReadOnlyStateDB{db}
 }
 
-func (db *readOnlyStateDB) SetPersistentState(addr common.Address, key common.Hash, value common.Hash) {
+func (db *ReadOnlyStateDB) SetPersistentState(addr common.Address, key common.Hash, value common.Hash) {
 	panic("stateDB write protection")
 }
 
-func (db *readOnlyStateDB) SetEphemeralState(addr common.Address, key common.Hash, value common.Hash) {
+func (db *ReadOnlyStateDB) SetEphemeralState(addr common.Address, key common.Hash, value common.Hash) {
 	panic("stateDB write protection")
 }
 
-func (db *readOnlyStateDB) AddPersistentPreimage(hash common.Hash, preimage []byte) {
+func (db *ReadOnlyStateDB) AddPersistentPreimage(hash common.Hash, preimage []byte) {
 	panic("stateDB write protection")
 }
 
-func (db *readOnlyStateDB) AddEphemeralPreimage(hash common.Hash, preimage []byte) {
+func (db *ReadOnlyStateDB) AddEphemeralPreimage(hash common.Hash, preimage []byte) {
 	panic("stateDB write protection")
 }
 
-var _ StateDB = &readOnlyStateDB{}
+var _ StateDB = &ReadOnlyStateDB{}
 
-type commitSafeStateDB struct {
+type CommitSafeStateDB struct {
 	StateDB
 }
 
 func NewCommitSafeStateDB(db StateDB) StateDB {
-	return &commitSafeStateDB{db}
+	return &CommitSafeStateDB{db}
 }
 
-func (db *commitSafeStateDB) SetPersistentState(addr common.Address, key common.Hash, value common.Hash) {
+func (db *CommitSafeStateDB) SetPersistentState(addr common.Address, key common.Hash, value common.Hash) {
 	panic("stateDB write protection")
 }
 
-var _ StateDB = &commitSafeStateDB{}
+var _ StateDB = &CommitSafeStateDB{}
 
 type EVM interface {
 	StateDB() StateDB
@@ -94,33 +94,33 @@ type EVM interface {
 	BlockCoinbase() common.Address
 }
 
-type readOnlyEVM struct {
+type ReadOnlyEVM struct {
 	EVM
 }
 
 func NewReadOnlyEVM(evm EVM) EVM {
-	return &readOnlyEVM{evm}
+	return &ReadOnlyEVM{evm}
 }
 
-func (evm *readOnlyEVM) StateDB() StateDB {
-	return &readOnlyStateDB{evm.EVM.StateDB()}
+func (evm *ReadOnlyEVM) StateDB() StateDB {
+	return &ReadOnlyStateDB{evm.EVM.StateDB()}
 }
 
-var _ EVM = &readOnlyEVM{}
+var _ EVM = &ReadOnlyEVM{}
 
-type commitSafeEVM struct {
+type CommitSafeEVM struct {
 	EVM
 }
 
 func NewCommitSafeEVM(evm EVM) EVM {
-	return &commitSafeEVM{evm}
+	return &CommitSafeEVM{evm}
 }
 
-func (evm *commitSafeEVM) StateDB() StateDB {
-	return &commitSafeStateDB{evm.EVM.StateDB()}
+func (evm *CommitSafeEVM) StateDB() StateDB {
+	return &CommitSafeStateDB{evm.EVM.StateDB()}
 }
 
-var _ EVM = &commitSafeEVM{}
+var _ EVM = &CommitSafeEVM{}
 
 type Storage interface {
 	Address() common.Address
@@ -132,24 +132,24 @@ type Storage interface {
 	GetPreimageSize(hash common.Hash) int
 }
 
-type persistentStorage struct {
+type PersistentStorage struct {
 	address common.Address
 	db      StateDB
 }
 
-func (s *persistentStorage) Address() common.Address {
+func (s *PersistentStorage) Address() common.Address {
 	return s.address
 }
 
-func (s *persistentStorage) Set(key common.Hash, value common.Hash) {
+func (s *PersistentStorage) Set(key common.Hash, value common.Hash) {
 	s.db.SetPersistentState(s.address, key, value)
 }
 
-func (s *persistentStorage) Get(key common.Hash) common.Hash {
+func (s *PersistentStorage) Get(key common.Hash) common.Hash {
 	return s.db.GetPersistentState(s.address, key)
 }
 
-func (s *persistentStorage) AddPreimage(preimage []byte) {
+func (s *PersistentStorage) AddPreimage(preimage []byte) {
 	if len(preimage) == 0 {
 		return
 	}
@@ -158,14 +158,14 @@ func (s *persistentStorage) AddPreimage(preimage []byte) {
 	s.db.AddPersistentPreimage(hash, preimage)
 }
 
-func (s *persistentStorage) HasPreimage(hash common.Hash) bool {
+func (s *PersistentStorage) HasPreimage(hash common.Hash) bool {
 	if hash == EmptyPreimageHash {
 		return true
 	}
 	return s.db.GetPersistentState(HashRegistryAddress, hash) == common.BytesToHash(common.Big1.Bytes())
 }
 
-func (s *persistentStorage) GetPreimage(hash common.Hash) []byte {
+func (s *PersistentStorage) GetPreimage(hash common.Hash) []byte {
 	if hash == EmptyPreimageHash {
 		return []byte{}
 	}
@@ -175,7 +175,7 @@ func (s *persistentStorage) GetPreimage(hash common.Hash) []byte {
 	return s.db.GetPersistentPreimage(hash)
 }
 
-func (s *persistentStorage) GetPreimageSize(hash common.Hash) int {
+func (s *PersistentStorage) GetPreimageSize(hash common.Hash) int {
 	if hash == EmptyPreimageHash {
 		return 0
 	}
@@ -185,26 +185,26 @@ func (s *persistentStorage) GetPreimageSize(hash common.Hash) int {
 	return s.db.GetPersistentPreimageSize(hash)
 }
 
-var _ Storage = (*persistentStorage)(nil)
+var _ Storage = (*PersistentStorage)(nil)
 
-type ephemeralStorage struct {
+type EphemeralStorage struct {
 	address common.Address
 	db      StateDB
 }
 
-func (s *ephemeralStorage) Address() common.Address {
+func (s *EphemeralStorage) Address() common.Address {
 	return s.address
 }
 
-func (s *ephemeralStorage) Set(key common.Hash, value common.Hash) {
+func (s *EphemeralStorage) Set(key common.Hash, value common.Hash) {
 	s.db.SetEphemeralState(s.address, key, value)
 }
 
-func (s *ephemeralStorage) Get(key common.Hash) common.Hash {
+func (s *EphemeralStorage) Get(key common.Hash) common.Hash {
 	return s.db.GetEphemeralState(s.address, key)
 }
 
-func (s *ephemeralStorage) AddPreimage(preimage []byte) {
+func (s *EphemeralStorage) AddPreimage(preimage []byte) {
 	if len(preimage) == 0 {
 		return
 	}
@@ -213,14 +213,14 @@ func (s *ephemeralStorage) AddPreimage(preimage []byte) {
 	s.db.AddEphemeralPreimage(hash, preimage)
 }
 
-func (s *ephemeralStorage) HasPreimage(hash common.Hash) bool {
+func (s *EphemeralStorage) HasPreimage(hash common.Hash) bool {
 	if hash == EmptyPreimageHash {
 		return true
 	}
 	return s.db.GetEphemeralState(HashRegistryAddress, hash) == common.BytesToHash(common.Big1.Bytes())
 }
 
-func (s *ephemeralStorage) GetPreimage(hash common.Hash) []byte {
+func (s *EphemeralStorage) GetPreimage(hash common.Hash) []byte {
 	if hash == EmptyPreimageHash {
 		return []byte{}
 	}
@@ -230,7 +230,7 @@ func (s *ephemeralStorage) GetPreimage(hash common.Hash) []byte {
 	return s.db.GetEphemeralPreimage(hash)
 }
 
-func (s *ephemeralStorage) GetPreimageSize(hash common.Hash) int {
+func (s *EphemeralStorage) GetPreimageSize(hash common.Hash) int {
 	if hash == EmptyPreimageHash {
 		return 0
 	}
@@ -240,7 +240,7 @@ func (s *ephemeralStorage) GetPreimageSize(hash common.Hash) int {
 	return s.db.GetEphemeralPreimageSize(hash)
 }
 
-var _ Storage = (*ephemeralStorage)(nil)
+var _ Storage = (*EphemeralStorage)(nil)
 
 type Block interface {
 	Timestamp() *big.Int
@@ -250,17 +250,17 @@ type Block interface {
 	Coinbase() common.Address
 }
 
-type block struct {
+type FullBlock struct {
 	evm EVM
 }
 
-func (b *block) Timestamp() *big.Int      { return b.evm.BlockTimestamp() }
-func (b *block) Number() *big.Int         { return b.evm.BlockNumber() }
-func (b *block) Difficulty() *big.Int     { return b.evm.BlockDifficulty() }
-func (b *block) GasLimit() *big.Int       { return b.evm.BlockGasLimit() }
-func (b *block) Coinbase() common.Address { return b.evm.BlockCoinbase() }
+func (b *FullBlock) Timestamp() *big.Int      { return b.evm.BlockTimestamp() }
+func (b *FullBlock) Number() *big.Int         { return b.evm.BlockNumber() }
+func (b *FullBlock) Difficulty() *big.Int     { return b.evm.BlockDifficulty() }
+func (b *FullBlock) GasLimit() *big.Int       { return b.evm.BlockGasLimit() }
+func (b *FullBlock) Coinbase() common.Address { return b.evm.BlockCoinbase() }
 
-var _ Block = (*block)(nil)
+var _ Block = (*FullBlock)(nil)
 
 type API interface {
 	Address() common.Address
@@ -272,7 +272,7 @@ type API interface {
 	Block() Block
 }
 
-type stateApi struct {
+type StateAPI struct {
 	address    common.Address
 	db         StateDB
 	persistent Datastore
@@ -280,27 +280,27 @@ type stateApi struct {
 }
 
 func NewStateAPI(db StateDB, address common.Address) API {
-	return &stateApi{
+	return &StateAPI{
 		address: address,
 		db:      db,
 	}
 }
 
-func (s *stateApi) Address() common.Address {
+func (s *StateAPI) Address() common.Address {
 	return s.address
 }
 
-func (s *stateApi) EVM() EVM {
+func (s *StateAPI) EVM() EVM {
 	return nil
 }
 
-func (s *stateApi) StateDB() StateDB {
+func (s *StateAPI) StateDB() StateDB {
 	return s.db
 }
 
-func (s *stateApi) Persistent() Datastore {
+func (s *StateAPI) Persistent() Datastore {
 	if s.persistent == nil {
-		s.persistent = &datastore{&persistentStorage{
+		s.persistent = &CoreDatastore{&PersistentStorage{
 			address: s.address,
 			db:      s.db,
 		}}
@@ -308,9 +308,9 @@ func (s *stateApi) Persistent() Datastore {
 	return s.persistent
 }
 
-func (s *stateApi) Ephemeral() Datastore {
+func (s *StateAPI) Ephemeral() Datastore {
 	if s.ephemeral == nil {
-		s.ephemeral = &datastore{&ephemeralStorage{
+		s.ephemeral = &CoreDatastore{&EphemeralStorage{
 			address: s.address,
 			db:      s.db,
 		}}
@@ -318,41 +318,41 @@ func (s *stateApi) Ephemeral() Datastore {
 	return s.ephemeral
 }
 
-func (s *stateApi) BlockHash(block *big.Int) common.Hash {
+func (s *StateAPI) BlockHash(block *big.Int) common.Hash {
 	panic("API method not available")
 }
 
-func (s *stateApi) Block() Block {
+func (s *StateAPI) Block() Block {
 	panic("API method not available")
 }
 
-var _ API = (*stateApi)(nil)
+var _ API = (*StateAPI)(nil)
 
-type fullApi struct {
-	stateApi
+type FullAPI struct {
+	StateAPI
 	evm EVM
 }
 
 func New(evm EVM, address common.Address) API {
-	return &fullApi{
-		stateApi: stateApi{address: address, db: evm.StateDB()},
+	return &FullAPI{
+		StateAPI: StateAPI{address: address, db: evm.StateDB()},
 		evm:      evm,
 	}
 }
 
-func (a *fullApi) EVM() EVM {
+func (a *FullAPI) EVM() EVM {
 	return a.evm
 }
 
-func (a *fullApi) BlockHash(block *big.Int) common.Hash {
+func (a *FullAPI) BlockHash(block *big.Int) common.Hash {
 	return a.evm.BlockHash(block)
 }
 
-func (a *fullApi) Block() Block {
-	return &block{evm: a.evm}
+func (a *FullAPI) Block() Block {
+	return &FullBlock{evm: a.evm}
 }
 
-var _ API = (*fullApi)(nil)
+var _ API = (*FullAPI)(nil)
 
 type Precompile interface {
 	MutatesStorage(input []byte) bool

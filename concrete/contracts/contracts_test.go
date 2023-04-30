@@ -21,6 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	cc_api_test "github.com/ethereum/go-ethereum/concrete/api/test"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/stretchr/testify/require"
 )
@@ -80,7 +81,7 @@ func TestRunPrecompile(t *testing.T) {
 
 	addr := common.BytesToAddress([]byte{1})
 	pc := &testPrecompile{}
-	evm := cc_api.NewMockEVM(cc_api.NewMockStateDB())
+	evm := cc_api_test.NewMockEVM(cc_api_test.NewMockStateDB())
 
 	input := []byte{0}
 	suppliedGas := uint64(0)

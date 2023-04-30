@@ -13,21 +13,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package api
+package test
 
 import (
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/concrete/api"
+	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReadOnlyStateDB(t *testing.T) {
-	sdb := NewReadOnlyStateDB(NewMockStateDB())
+	sdb := cc_api.NewReadOnlyStateDB(NewMockStateDB())
 
 	// Test type
-	require.IsType(t, &readOnlyStateDB{}, sdb, "NewReadOnlyStateDB should return a readOnlyStateDB")
+	require.IsType(t, &cc_api.ReadOnlyStateDB{}, sdb, "NewReadOnlyStateDB should return a readOnlyStateDB")
 
 	// Test SetPersistentState panics
 	require.Panics(t, func() {
@@ -81,10 +83,10 @@ func TestReadOnlyStateDB(t *testing.T) {
 }
 
 func TestCommitSafeStateDB(t *testing.T) {
-	sdb := NewCommitSafeStateDB(NewMockStateDB())
+	sdb := cc_api.NewCommitSafeStateDB(NewMockStateDB())
 
 	// Test type
-	require.IsType(t, &commitSafeStateDB{}, sdb, "NewCommitSafeStateDB should return a commitSafeStateDB")
+	require.IsType(t, &cc_api.CommitSafeStateDB{}, sdb, "NewCommitSafeStateDB should return a CommitSafeStateDB")
 
 	// Test SetPersistentState
 	require.Panics(t, func() {
@@ -138,31 +140,31 @@ func TestCommitSafeStateDB(t *testing.T) {
 }
 
 func TestReadOnlyEVM(t *testing.T) {
-	evm := NewReadOnlyEVM(NewMockEVM(NewMockStateDB()))
+	evm := cc_api.NewReadOnlyEVM(NewMockEVM(NewMockStateDB()))
 
 	// Test type
-	require.IsType(t, &readOnlyEVM{}, evm, "NewReadOnlyEVM should return a readOnlyEVM")
+	require.IsType(t, &cc_api.ReadOnlyEVM{}, evm, "NewReadOnlyEVM should return a readOnlyEVM")
 
 	// Test StateDB returns readOnlyStateDB
 	sdb := evm.StateDB()
-	require.IsType(t, &readOnlyStateDB{}, sdb, "StateDB should return readOnlyStateDB")
+	require.IsType(t, &cc_api.ReadOnlyStateDB{}, sdb, "StateDB should return readOnlyStateDB")
 }
 
 func TestCommitSafeEVM(t *testing.T) {
-	evm := NewCommitSafeEVM(NewMockEVM(NewMockStateDB()))
+	evm := cc_api.NewCommitSafeEVM(NewMockEVM(NewMockStateDB()))
 
 	// Test type
-	require.IsType(t, &commitSafeEVM{}, evm, "NewCommitSafeEVM should return a commitSafeEVM")
+	require.IsType(t, &cc_api.CommitSafeEVM{}, evm, "NewCommitSafeEVM should return a commitSafeEVM")
 
-	// Test StateDB returns commitSafeStateDB
+	// Test StateDB returns CommitSafeStateDB
 	sdb := evm.StateDB()
-	require.IsType(t, &commitSafeStateDB{}, sdb, "StateDB should return commitSafeStateDB")
+	require.IsType(t, &cc_api.CommitSafeStateDB{}, sdb, "StateDB should return CommitSafeStateDB")
 }
 
 func TestPersistentStorage(t *testing.T) {
 	sdb := NewMockStateDB()
 	address := common.HexToAddress("0x01")
-	storage := &persistentStorage{address, sdb}
+	storage := cc_api.NewPersistentStorage(sdb, address)
 	TestStorage(t, storage)
 	FuzzStorage(t, storage)
 }
@@ -170,7 +172,7 @@ func TestPersistentStorage(t *testing.T) {
 func TestEphemeralStorage(t *testing.T) {
 	sdb := NewMockStateDB()
 	address := common.HexToAddress("0x01")
-	storage := &ephemeralStorage{address, sdb}
+	storage := cc_api.NewEphemeralStorage(sdb, address)
 	TestStorage(t, storage)
 	FuzzStorage(t, storage)
 }
@@ -178,7 +180,7 @@ func TestEphemeralStorage(t *testing.T) {
 func TestStateAPI(t *testing.T) {
 	address := common.HexToAddress("0x01")
 	sdb := NewMockStateDB()
-	api := NewStateAPI(sdb, address)
+	api := cc_api.NewStateAPI(sdb, address)
 
 	// Test Address
 	require.Equal(t, address, api.Address(), "Address should return correct address")
@@ -192,16 +194,16 @@ func TestStateAPI(t *testing.T) {
 	// Test Persistent
 	persistent := api.Persistent()
 	require.NotNil(t, persistent, "Persistent should not be nil")
-	require.IsType(t, &datastore{}, persistent, "Persistent should return a datastore instance")
-	persistentStruct, _ := persistent.(*datastore)
-	require.IsType(t, &persistentStorage{}, persistentStruct.Storage, "Persistent should return a PersistentStorage instance")
+	require.IsType(t, &cc_api.CoreDatastore{}, persistent, "Persistent should return a datastore instance")
+	persistentStruct, _ := persistent.(*cc_api.CoreDatastore)
+	require.IsType(t, &cc_api.PersistentStorage{}, persistentStruct.Storage, "Persistent should return a PersistentStorage instance")
 
 	// Test Ephemeral
 	ephemeral := api.Ephemeral()
 	require.NotNil(t, ephemeral, "Ephemeral should not be nil")
-	require.IsType(t, &datastore{}, ephemeral, "Ephemeral should return a datastore instance")
-	ephemeralStruct, _ := ephemeral.(*datastore)
-	require.IsType(t, &ephemeralStorage{}, ephemeralStruct.Storage, "Ephemeral should return a EphemeralStorage instance")
+	require.IsType(t, &cc_api.CoreDatastore{}, ephemeral, "Ephemeral should return a datastore instance")
+	ephemeralStruct, _ := ephemeral.(*cc_api.CoreDatastore)
+	require.IsType(t, &cc_api.EphemeralStorage{}, ephemeralStruct.Storage, "Ephemeral should return a EphemeralStorage instance")
 
 	// Test BlockHash
 	require.Panics(t, func() {
@@ -218,7 +220,7 @@ func TestAPI(t *testing.T) {
 	address := common.HexToAddress("0x01")
 	sdb := NewMockStateDB()
 	evm := NewMockEVM(sdb)
-	api := New(evm, address)
+	api := api.New(evm, address)
 
 	// Test Address
 	require.Equal(t, address, api.Address(), "Address should return correct address")
@@ -232,16 +234,16 @@ func TestAPI(t *testing.T) {
 	// Test Persistent
 	persistent := api.Persistent()
 	require.NotNil(t, persistent, "Persistent should not be nil")
-	require.IsType(t, &datastore{}, persistent, "Persistent should return a datastore instance")
-	persistentStruct, _ := persistent.(*datastore)
-	require.IsType(t, &persistentStorage{}, persistentStruct.Storage, "Persistent should return a PersistentStorage instance")
+	require.IsType(t, &cc_api.CoreDatastore{}, persistent, "Persistent should return a datastore instance")
+	persistentStruct, _ := persistent.(*cc_api.CoreDatastore)
+	require.IsType(t, &cc_api.PersistentStorage{}, persistentStruct.Storage, "Persistent should return a PersistentStorage instance")
 
 	// Test Ephemeral
 	ephemeral := api.Ephemeral()
 	require.NotNil(t, ephemeral, "Ephemeral should not be nil")
-	require.IsType(t, &datastore{}, ephemeral, "Ephemeral should return a datastore instance")
-	ephemeralStruct, _ := ephemeral.(*datastore)
-	require.IsType(t, &ephemeralStorage{}, ephemeralStruct.Storage, "Ephemeral should return a EphemeralStorage instance")
+	require.IsType(t, &cc_api.CoreDatastore{}, ephemeral, "Ephemeral should return a datastore instance")
+	ephemeralStruct, _ := ephemeral.(*cc_api.CoreDatastore)
+	require.IsType(t, &cc_api.EphemeralStorage{}, ephemeralStruct.Storage, "Ephemeral should return a EphemeralStorage instance")
 
 	// Test BlockHash
 	require.NotPanics(t, func() {
@@ -256,32 +258,32 @@ func TestAPI(t *testing.T) {
 
 func TestReadOnlyAPI(t *testing.T) {
 	address := common.HexToAddress("0x01")
-	evm := NewReadOnlyEVM(NewMockEVM(NewMockStateDB()))
-	api := New(evm, address)
-	apiStruct, _ := api.(*fullApi)
-	require.IsType(t, &readOnlyStateDB{}, apiStruct.db, "StateDB should be readOnlyStateDB")
+	evm := api.NewReadOnlyEVM(NewMockEVM(NewMockStateDB()))
+	api := api.New(evm, address)
+	apiStruct, _ := api.(*cc_api.FullAPI)
+	require.IsType(t, &cc_api.ReadOnlyStateDB{}, apiStruct.StateDB(), "StateDB should be readOnlyStateDB")
 }
 
 func TestCommitSafeAPI(t *testing.T) {
 	address := common.HexToAddress("0x01")
-	evm := NewCommitSafeEVM(NewMockEVM(NewMockStateDB()))
-	api := New(evm, address)
-	apiStruct, _ := api.(*fullApi)
-	require.IsType(t, &commitSafeStateDB{}, apiStruct.db, "StateDB should be commitSafeStateDB")
+	evm := api.NewCommitSafeEVM(NewMockEVM(NewMockStateDB()))
+	api := api.New(evm, address)
+	apiStruct, _ := api.(*cc_api.FullAPI)
+	require.IsType(t, &cc_api.CommitSafeStateDB{}, apiStruct.StateDB(), "StateDB should be CommitSafeStateDB")
 }
 
 func TestReadOnlyStateAPI(t *testing.T) {
 	address := common.HexToAddress("0x01")
-	sdb := NewReadOnlyStateDB(NewMockStateDB())
-	api := NewStateAPI(sdb, address)
-	apiStruct, _ := api.(*stateApi)
-	require.IsType(t, &readOnlyStateDB{}, apiStruct.db, "StateDB should be readOnlyStateDB")
+	sdb := api.NewReadOnlyStateDB(NewMockStateDB())
+	api := api.NewStateAPI(sdb, address)
+	apiStruct, _ := api.(*cc_api.StateAPI)
+	require.IsType(t, &cc_api.ReadOnlyStateDB{}, apiStruct.StateDB(), "StateDB should be readOnlyStateDB")
 }
 
 func TestCommitSafeStateAPI(t *testing.T) {
 	address := common.HexToAddress("0x01")
-	sdb := NewCommitSafeStateDB(NewMockStateDB())
-	api := NewStateAPI(sdb, address)
-	apiStruct, _ := api.(*stateApi)
-	require.IsType(t, &commitSafeStateDB{}, apiStruct.db, "StateDB should be commitSafeStateDB")
+	sdb := api.NewCommitSafeStateDB(NewMockStateDB())
+	api := api.NewStateAPI(sdb, address)
+	apiStruct, _ := api.(*cc_api.StateAPI)
+	require.IsType(t, &cc_api.CommitSafeStateDB{}, apiStruct.StateDB(), "StateDB should be CommitSafeStateDB")
 }
