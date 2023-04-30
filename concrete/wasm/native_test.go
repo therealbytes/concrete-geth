@@ -31,7 +31,7 @@ var blankCode []byte
 
 func TestReadWriteMemory(t *testing.T) {
 	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
+	mod, _, _ := newModule(&bridgeConfig{}, blankCode)
 
 	data := []byte{1, 2, 3, 4, 5}
 	ptr, err := native.WriteMemory(ctx, mod, data)
@@ -45,7 +45,7 @@ func TestReadWriteMemory(t *testing.T) {
 
 func TestFreeMemory(t *testing.T) {
 	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
+	mod, _, _ := newModule(&bridgeConfig{}, blankCode)
 
 	data := []byte{1, 2, 3, 4, 5}
 
@@ -60,7 +60,7 @@ func TestFreeMemory(t *testing.T) {
 
 func TestPruneMemory(t *testing.T) {
 	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
+	mod, _, _ := newModule(&bridgeConfig{}, blankCode)
 
 	data := []byte{1, 2, 3, 4, 5}
 
@@ -79,7 +79,7 @@ func TestPruneMemory(t *testing.T) {
 
 func TestPutGetValues(t *testing.T) {
 	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
+	mod, _, _ := newModule(&bridgeConfig{}, blankCode)
 
 	// Test PutValue and GetValue
 	value := []byte{0x01, 0x02, 0x03}
@@ -106,7 +106,7 @@ func TestPutGetValues(t *testing.T) {
 
 func TestPutGetArgs(t *testing.T) {
 	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
+	mod, _, _ := newModule(&bridgeConfig{}, blankCode)
 
 	// Test PutArgs and GetArgs
 	args := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
@@ -126,7 +126,7 @@ func TestPutGetArgs(t *testing.T) {
 
 func TestPutGetReturn(t *testing.T) {
 	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
+	mod, _, _ := newModule(&bridgeConfig{}, blankCode)
 
 	// Test PutReturn and GetReturn
 	retValues := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
@@ -146,7 +146,7 @@ func TestPutGetReturn(t *testing.T) {
 
 func TestPutGetReturnWithError(t *testing.T) {
 	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{}, blankCode)
+	mod, _, _ := newModule(&bridgeConfig{}, blankCode)
 
 	// Test with success
 	retValues := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}

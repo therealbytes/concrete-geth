@@ -18,11 +18,11 @@ package wasm
 import (
 	"context"
 	_ "embed"
+	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
-	cc_api_test "github.com/ethereum/go-ethereum/concrete/api/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/stretchr/testify/require"
@@ -48,43 +48,57 @@ func TestStatelessWasmBridges(t *testing.T) {
 		return native.PutValue(ctx, module, address.Bytes()).Uint64()
 	}
 
-	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{addressBridge: bridgeAddress, logBridge: bridgeLog}, logCode)
-	db := cc_api_test.NewMockStateDB()
-	evm := cc_api_test.NewMockEVM(db)
-	api := cc_api.New(evm, address)
-	pc := NewStatelessWasmPrecompile(mod)
+	mod, r, _ := newModule(&bridgeConfig{addressBridge: bridgeAddress, logBridge: bridgeLog}, logCode)
+	pc := &statelessWasmPrecompile{wasmPrecompile{r, mod, newMutexQueue(1)}}
+	var api cc_api.API
+
+	defer pc.close()
 
 	// Test Log
-	pc.Run(api, []byte("hello world"))
-	require.Equal(t, "hello world", lastLog)
-	pc.Run(api, []byte("bye world"))
-	require.Equal(t, "bye world", lastLog)
+	str1 := "hello world"
+	str2 := "bye world"
+	pc.Run(api, []byte(str1))
+	require.Equal(t, str1, lastLog)
+	pc.Run(api, []byte(str2))
+	require.Equal(t, str2, lastLog)
 
 	// Test Address
 }
 
-func TestNativeBridges(t *testing.T) {
+func TestStatelessPrecompile(t *testing.T) {
 	address := common.HexToAddress("0x01")
-	ctx := context.Background()
-	mod, _, _ := newModule(ctx, &bridgeConfig{}, echoCode)
-	db := cc_api_test.NewMockStateDB()
-	evm := cc_api_test.NewMockEVM(db)
-	api := cc_api.New(evm, address)
-	pc := NewStatelessWasmPrecompile(mod)
+	pc := NewWasmPrecompile(echoCode, address)
+	var api cc_api.API
 
-	// Test Run
-	data := []byte("hello world")
-	result, err := pc.Run(api, data)
-	require.NoError(t, err)
-	require.Equal(t, data, result)
+	require.IsType(t, &statelessWasmPrecompile{}, pc)
 
-	// Test RequiredGas
-	data = []byte{2}
-	gas := pc.RequiredGas(data)
-	require.Equal(t, uint64(2), gas)
+	// Test MutatesStorage, Finalise, and Commit
+	require.False(t, pc.MutatesStorage([]byte("hello world")))
+	require.NoError(t, pc.Finalise(api))
+	require.NoError(t, pc.Commit(api))
 
-	// Test Finalise
-	// Test Commit
-	// Test IsPure
+	// Test Run and RequiredGas
+	testRun := func(data []byte, wg *sync.WaitGroup) {
+		defer wg.Done()
+		result, err := pc.Run(api, data)
+		require.NoError(t, err)
+		require.Equal(t, data, result)
+	}
+	testRequiredGas := func(data byte, wg *sync.WaitGroup) {
+		defer wg.Done()
+		gas := pc.RequiredGas([]byte{data})
+		require.Equal(t, uint64(data), gas)
+	}
+
+	var wg sync.WaitGroup
+	routines := 30
+	wg.Add(routines)
+	for ii := 0; ii < routines; ii++ {
+		if ii%2 == 0 {
+			go testRequiredGas(byte(ii), &wg)
+		} else {
+			go testRun([]byte{byte(ii)}, &wg)
+		}
+	}
+	wg.Wait()
 }
