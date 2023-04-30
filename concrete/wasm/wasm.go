@@ -42,12 +42,12 @@ var (
 )
 
 func NewWasmPrecompile(code []byte, address common.Address) cc_api.Precompile {
-	pc := NewStatelessWasmPrecompile(code, address)
+	pc := newStatelessWasmPrecompile(code, address)
 	if pc.isPure() {
 		return pc
 	}
 	pc.close()
-	return NewStatefulWasmPrecompile(code)
+	return newStatefulWasmPrecompile(code)
 }
 
 type bridgeConfig struct {
@@ -186,7 +186,7 @@ type statelessWasmPrecompile struct {
 	wasmPrecompile
 }
 
-func NewStatelessWasmPrecompile(code []byte, address common.Address) *statelessWasmPrecompile {
+func newStatelessWasmPrecompile(code []byte, address common.Address) *statelessWasmPrecompile {
 	addressBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
 		return native.BridgeAddress(ctx, mod, pointer, address)
 	}
@@ -235,7 +235,7 @@ type statefulWasmPrecompile struct {
 	api cc_api.API
 }
 
-func NewStatefulWasmPrecompile(code []byte) *statefulWasmPrecompile {
+func newStatefulWasmPrecompile(code []byte) *statefulWasmPrecompile {
 	pc := &statefulWasmPrecompile{}
 
 	evmBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
