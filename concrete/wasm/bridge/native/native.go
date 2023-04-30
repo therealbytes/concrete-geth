@@ -252,11 +252,11 @@ func BridgeCallEVM(ctx context.Context, module wz_api.Module, pointer uint64, ev
 	var opcode bridge.OpCode
 	opcode.Decode(args[0])
 	args = args[1:]
-	out := callEVM(evm, opcode, args)
+	out := CallEVM(evm, opcode, args)
 	return PutValue(ctx, module, out).Uint64()
 }
 
-func callEVM(evm api.EVM, opcode bridge.OpCode, args [][]byte) []byte {
+func CallEVM(evm api.EVM, opcode bridge.OpCode, args [][]byte) []byte {
 	switch opcode {
 	case bridge.Op_EVM_BlockHash:
 		block := new(big.Int).SetBytes(args[0])

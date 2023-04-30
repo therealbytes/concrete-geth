@@ -16,6 +16,7 @@
 package wasm
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,9 +24,10 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
+	"github.com/stretchr/testify/require"
 )
 
-func newBridgeFunc(memory wasm.Memory, db api.StateDB) wasm.WasmBridgeFunc {
+func newStateDBBridgeFunc(memory wasm.Memory, db api.StateDB) wasm.WasmBridgeFunc {
 	return func(pointer uint64) uint64 {
 		args := wasm.GetArgs(memory, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
@@ -38,7 +40,7 @@ func newBridgeFunc(memory wasm.Memory, db api.StateDB) wasm.WasmBridgeFunc {
 
 func newProxyStateDB(db api.StateDB) api.StateDB {
 	mem := wasm.NewMockMemory()
-	bridgeFunc := newBridgeFunc(mem, db)
+	bridgeFunc := newStateDBBridgeFunc(mem, db)
 	return wasm.NewProxyStateDB(mem, bridgeFunc)
 }
 
@@ -81,7 +83,7 @@ func (s *readWriteStorage) GetPreimageSize(hash common.Hash) int {
 	return s.read.GetPreimageSize(hash)
 }
 
-func TestStateDBBridge(t *testing.T) {
+func TestStateDBBProxy(t *testing.T) {
 	address := common.HexToAddress("0x01")
 	statedb := api.NewMockStateDB()
 	proxy := newProxyStateDB(statedb)
@@ -104,4 +106,55 @@ func TestStateDBBridge(t *testing.T) {
 	// Fuzz proxy
 	api.FuzzStorage(t, proxyPersistent)
 	api.FuzzStorage(t, proxyEphemeral)
+}
+
+type mockEVM struct {
+	db api.StateDB
+}
+
+func newEVMStub(db api.StateDB) api.EVM {
+	return &mockEVM{
+		db: db,
+	}
+}
+
+func (m *mockEVM) StateDB() api.StateDB                 { return m.db }
+func (m *mockEVM) BlockHash(block *big.Int) common.Hash { return common.Hash{2} }
+func (m *mockEVM) BlockTimestamp() *big.Int             { return common.Big2 }
+func (m *mockEVM) BlockNumber() *big.Int                { return common.Big2 }
+func (m *mockEVM) BlockDifficulty() *big.Int            { return common.Big2 }
+func (m *mockEVM) BlockGasLimit() *big.Int              { return common.Big2 }
+func (m *mockEVM) BlockCoinbase() common.Address        { return common.Address{2} }
+
+var _ api.EVM = &mockEVM{}
+
+func newEVMBridgeFunc(memory wasm.Memory, evm api.EVM) wasm.WasmBridgeFunc {
+	return func(pointer uint64) uint64 {
+		args := wasm.GetArgs(memory, bridge.MemPointer(pointer))
+		var opcode bridge.OpCode
+		opcode.Decode(args[0])
+		args = args[1:]
+		out := native.CallEVM(evm, opcode, args)
+		return wasm.PutValue(memory, out).Uint64()
+	}
+}
+
+func newProxyEVM(evm api.EVM) api.EVM {
+	mem := wasm.NewMockMemory()
+	stateDBBridgeFunc := newStateDBBridgeFunc(mem, evm.StateDB())
+	evmBridgeFunc := newEVMBridgeFunc(mem, evm)
+	return wasm.NewProxyEVM(mem, evmBridgeFunc, stateDBBridgeFunc)
+}
+
+func TestEVMBridge(t *testing.T) {
+	db := api.NewMockStateDB()
+	evm := newEVMStub(db)
+	proxy := newProxyEVM(evm)
+
+	require.Equal(t, evm.BlockHash(common.Big1), proxy.BlockHash(common.Big1))
+	require.Equal(t, evm.BlockTimestamp(), proxy.BlockTimestamp())
+	require.Equal(t, evm.BlockNumber(), proxy.BlockNumber())
+	require.Equal(t, evm.BlockDifficulty(), proxy.BlockDifficulty())
+	require.Equal(t, evm.BlockGasLimit(), proxy.BlockGasLimit())
+	require.Equal(t, evm.BlockCoinbase(), proxy.BlockCoinbase())
 }
