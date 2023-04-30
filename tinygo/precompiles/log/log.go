@@ -23,7 +23,7 @@ import (
 )
 
 type log struct {
-	lib.Blank
+	lib.BlankPrecompile
 }
 
 func (pc *log) Run(api cc_api.API, input []byte) ([]byte, error) {

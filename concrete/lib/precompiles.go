@@ -22,46 +22,46 @@ import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 )
 
-type Blank struct{}
+type BlankPrecompile struct{}
 
-func (pc *Blank) MutatesStorage(input []byte) bool {
+func (pc *BlankPrecompile) MutatesStorage(input []byte) bool {
 	return false
 }
 
-func (pc *Blank) RequiredGas(input []byte) uint64 {
+func (pc *BlankPrecompile) RequiredGas(input []byte) uint64 {
 	return 0
 }
 
-func (pc *Blank) Finalise(api cc_api.API) error {
+func (pc *BlankPrecompile) Finalise(api cc_api.API) error {
 	return nil
 }
 
-func (pc *Blank) Commit(api cc_api.API) error {
+func (pc *BlankPrecompile) Commit(api cc_api.API) error {
 	return nil
 }
 
-func (pc *Blank) Run(api cc_api.API, input []byte) ([]byte, error) {
+func (pc *BlankPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
 	return []byte{}, nil
 }
 
-var _ cc_api.Precompile = &Blank{}
+var _ cc_api.Precompile = &BlankPrecompile{}
 
-type Echo struct {
-	Blank
+type EchoPrecompile struct {
+	BlankPrecompile
 }
 
-func (pc *Echo) RequiredGas(input []byte) uint64 {
+func (pc *EchoPrecompile) RequiredGas(input []byte) uint64 {
 	if len(input) == 0 {
 		return 0
 	}
 	return uint64(input[0])
 }
 
-func (pc *Echo) Run(api cc_api.API, input []byte) ([]byte, error) {
+func (pc *EchoPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
 	return input, nil
 }
 
-var _ cc_api.Precompile = &Echo{}
+var _ cc_api.Precompile = &EchoPrecompile{}
 
 type PrecompileDemux map[int]cc_api.Precompile
 
