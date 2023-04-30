@@ -1117,11 +1117,6 @@ func (s *StateDB) Finalise(deleteEmptyObjects bool) {
 	s.clearJournalAndRefund()
 }
 
-var (
-	EphemeralStateAddress = common.BytesToAddress(crypto.Keccak256([]byte("concrete.EphemeralState.v0")))
-	EphemeralStateRootKey = crypto.Keccak256Hash([]byte("concrete.EphemeralState.v0.Root"))
-)
-
 // IntermediateRoot computes the current root hash of the state trie.
 // It is called in between transactions to get the root hash that
 // goes into transaction receipts.
