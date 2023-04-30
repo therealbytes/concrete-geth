@@ -313,6 +313,10 @@ func (bc *BlockChain) ContractCodeWithPrefix(hash common.Hash) ([]byte, error) {
 	return bc.stateCache.(codeReader).ContractCodeWithPrefix(common.Hash{}, hash)
 }
 
+func (bc *BlockChain) ConcretePreimage(hash common.Hash) ([]byte, error) {
+	return bc.stateCache.ConcretePreimage(hash)
+}
+
 // State returns a new mutable state based on the current HEAD block.
 func (bc *BlockChain) State() (*state.StateDB, error) {
 	return bc.StateAt(bc.CurrentBlock().Root())
