@@ -150,3 +150,35 @@ func TestStatefulPrecompile(t *testing.T) {
 
 	wg.Wait()
 }
+
+func BenchmarkNativePrecompile(b *testing.B) {
+	address := common.HexToAddress("0x01")
+	pc := lib.TypicalPrecompile{}
+
+	statedb := test.NewTestStateDB()
+	evm := test.NewTestEVM(statedb)
+	api := cc_api.New(evm, address)
+
+	preimage := []byte("hello world")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pc.Run(api, preimage)
+	}
+}
+
+func BenchmarkWasmPrecompile(b *testing.B) {
+	address := common.HexToAddress("0x01")
+	pc := NewWasmPrecompile(typicalCode, address)
+
+	statedb := test.NewTestStateDB()
+	evm := test.NewTestEVM(statedb)
+	api := cc_api.New(evm, address)
+
+	preimage := []byte("hello world")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pc.Run(api, preimage)
+	}
+}
