@@ -304,7 +304,7 @@ func BridgeLog(ctx context.Context, module wz_api.Module, pointer uint64) uint64
 }
 
 func BridgeKeccak256(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-	data := GetValue(ctx, module, bridge.MemPointer(pointer))
-	hash := crypto.Keccak256(data)
+	data := GetValues(ctx, module, bridge.MemPointer(pointer))
+	hash := crypto.Keccak256(data...)
 	return PutValue(ctx, module, hash).Uint64()
 }
