@@ -56,7 +56,8 @@ func _AddressBridge(pointer uint64) uint64
 
 func AddressBridge() common.Address {
 	pointer := _AddressBridge(0)
-	return common.BytesToAddress(mem.Memory.Deref(bridge.MemPointer(pointer)))
+	address := mem.GetValue(pointer)
+	return common.BytesToAddress(address)
 }
 
 func NewAPI() cc_api.API {
@@ -113,5 +114,5 @@ func Run(pointer uint64) uint64 {
 	input := mem.GetValue(pointer)
 	api := NewAPI()
 	output, err := precompile.Run(api, input)
-	return wasm.PutReturnWithError(mem.Memory, [][]byte{output}, err).Uint64()
+	return mem.PutReturnWithError([][]byte{output}, err)
 }

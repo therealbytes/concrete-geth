@@ -19,8 +19,11 @@ package std
 
 import (
 	"fmt"
+	"hash"
 
-	"github.com/ethereum/go-ethereum/tinygo"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/tinygo/mem"
+	"golang.org/x/crypto/sha3"
 )
 
 //go:wasm-module env
@@ -29,7 +32,7 @@ func _LogBridge(pointer uint64) uint64
 
 func Log(a ...any) uint64 {
 	msg := fmt.Sprintln(a...)
-	pointer := tinygo.PutValue([]byte(msg[:len(msg)-1]))
+	pointer := mem.PutValue([]byte(msg[:len(msg)-1]))
 	return _LogBridge(pointer)
 }
 

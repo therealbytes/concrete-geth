@@ -21,7 +21,7 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
+	wasm_mem "github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm/mem"
 )
 
 type memory struct{}
@@ -51,14 +51,46 @@ func (m *memory) Deref(pointer bridge.MemPointer) []byte {
 	}))
 }
 
-var Memory wasm.Memory = &memory{}
+var Memory wasm_mem.Memory = &memory{}
 
 func PutValue(value []byte) uint64 {
-	return uint64(wasm.PutValue(Memory, value))
+	return uint64(wasm_mem.PutValue(Memory, value))
 }
 
 func GetValue(pointer uint64) []byte {
-	return wasm.GetValue(Memory, bridge.MemPointer(pointer))
+	return wasm_mem.GetValue(Memory, bridge.MemPointer(pointer))
+}
+
+func PutValues(values [][]byte) uint64 {
+	return uint64(wasm_mem.PutValues(Memory, values))
+}
+
+func GetValues(pointer uint64) [][]byte {
+	return wasm_mem.GetValues(Memory, bridge.MemPointer(pointer))
+}
+
+func PutArgs(values [][]byte) uint64 {
+	return uint64(wasm_mem.PutArgs(Memory, values))
+}
+
+func GetArgs(pointer uint64) [][]byte {
+	return wasm_mem.GetArgs(Memory, bridge.MemPointer(pointer))
+}
+
+func PutReturn(values [][]byte) uint64 {
+	return uint64(wasm_mem.PutReturn(Memory, values))
+}
+
+func GetReturn(pointer uint64) [][]byte {
+	return wasm_mem.GetReturn(Memory, bridge.MemPointer(pointer))
+}
+
+func PutReturnWithError(values [][]byte, err error) uint64 {
+	return uint64(wasm_mem.PutReturnWithError(Memory, values, err))
+}
+
+func GetReturnWithError(pointer uint64) ([][]byte, error) {
+	return wasm_mem.GetReturnWithError(Memory, bridge.MemPointer(pointer))
 }
 
 var allocs = sync.Map{}
