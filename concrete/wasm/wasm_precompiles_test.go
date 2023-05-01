@@ -152,14 +152,41 @@ func TestStatefulPrecompile(t *testing.T) {
 	wg.Wait()
 }
 
-func BenchmarkNativePrecompile(b *testing.B) {
-	address := common.HexToAddress("0x01")
-	pc := lib.TypicalPrecompile{}
-
+func newBenchmarkAPI(address common.Address) cc_api.API {
 	statedb := test.NewTestStateDB()
 	evm := test.NewTestEVM(statedb)
 	api := cc_api.New(evm, address)
+	return api
+}
 
+func BenchmarkNativeEchoPrecompile(b *testing.B) {
+	address := common.HexToAddress("0x01")
+	api := newBenchmarkAPI(address)
+	pc := lib.EchoPrecompile{}
+	input := []byte("hello world")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pc.Run(api, input)
+	}
+}
+
+func BenchmarkWasmEchoPrecompile(b *testing.B) {
+	address := common.HexToAddress("0x01")
+	api := newBenchmarkAPI(address)
+	pc := NewWasmPrecompile(echoCode, address)
+	input := []byte("hello world")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pc.Run(api, input)
+	}
+}
+
+func BenchmarkNativeTypicalPrecompile(b *testing.B) {
+	address := common.HexToAddress("0x01")
+	api := newBenchmarkAPI(address)
+	pc := lib.TypicalPrecompile{}
 	preimage := []byte("hello world")
 
 	b.ResetTimer()
@@ -168,14 +195,10 @@ func BenchmarkNativePrecompile(b *testing.B) {
 	}
 }
 
-func BenchmarkWasmPrecompile(b *testing.B) {
+func BenchmarkWasmTypicalPrecompile(b *testing.B) {
 	address := common.HexToAddress("0x01")
+	api := newBenchmarkAPI(address)
 	pc := NewWasmPrecompile(typicalCode, address)
-
-	statedb := test.NewTestStateDB()
-	evm := test.NewTestEVM(statedb)
-	api := cc_api.New(evm, address)
-
 	preimage := []byte("hello world")
 
 	b.ResetTimer()
