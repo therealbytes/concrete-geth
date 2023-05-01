@@ -32,7 +32,7 @@ func TestAddPrecompile(t *testing.T) {
 
 	for i := byte(0); i < 10; i++ {
 		addr := common.BytesToAddress([]byte{i})
-		err := AddPrecompile(addr, &lib.Blank{})
+		err := AddPrecompile(addr, &lib.BlankPrecompile{})
 		require.NoError(t, err, "AddPrecompile should not return an error")
 		_, ok := GetPrecompile(addr)
 		require.True(t, ok, "Expected precompile at address %x", addr)
@@ -50,7 +50,7 @@ var (
 )
 
 type testPrecompile struct {
-	lib.Blank
+	lib.BlankPrecompile
 }
 
 func (p *testPrecompile) RequiredGas(input []byte) uint64 {
