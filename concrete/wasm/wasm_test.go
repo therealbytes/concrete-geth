@@ -23,6 +23,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/stretchr/testify/require"
@@ -34,6 +35,9 @@ var echoCode []byte
 
 //go:embed bin/log.wasm
 var logCode []byte
+
+//go:embed bin/typical.wasm
+var typicalCode []byte
 
 func TestStatelessWasmBridges(t *testing.T) {
 	address := common.HexToAddress("0x01")
@@ -97,7 +101,7 @@ func TestStatelessPrecompile(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	routines := 6 * 5
+	routines := 10 * 5
 	wg.Add(routines)
 	for ii := 0; ii < routines/5; ii++ {
 		data := []byte{byte(ii)}
@@ -107,5 +111,33 @@ func TestStatelessPrecompile(t *testing.T) {
 		go testRun(data, &wg)
 		go testRequiredGas(data, &wg)
 	}
+	wg.Wait()
+}
+
+func TestStatefulPrecompile(t *testing.T) {
+	address := common.HexToAddress("0x01")
+	pc := NewWasmPrecompile(typicalCode, address)
+
+	require.IsType(t, &statefulWasmPrecompile{}, pc)
+
+	var wg sync.WaitGroup
+	routines := 50
+	iterations := 100
+	wg.Add(routines)
+
+	for ii := 0; ii < routines; ii++ {
+		go func(ii int) {
+			defer wg.Done()
+			statedb := test.NewTestStateDB()
+			evm := test.NewTestEVM(statedb)
+			api := cc_api.New(evm, address)
+			for jj := 0; jj < iterations; jj++ {
+				data := []byte{byte(ii), byte(jj)}
+				_, err := pc.Run(api, data)
+				require.NoError(t, err)
+			}
+		}(ii)
+	}
+
 	wg.Wait()
 }
