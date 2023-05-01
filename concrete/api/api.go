@@ -262,6 +262,13 @@ func (b *FullBlock) Coinbase() common.Address { return b.evm.BlockCoinbase() }
 
 var _ Block = (*FullBlock)(nil)
 
+type LiteAPI interface {
+	Address() common.Address
+	Persistent() Datastore
+	BlockHash(block *big.Int) common.Hash
+	Block() Block
+}
+
 type API interface {
 	Address() common.Address
 	EVM() EVM
