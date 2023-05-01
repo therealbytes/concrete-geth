@@ -26,13 +26,15 @@ import (
 )
 
 func TestStorage(t *testing.T, storage api.Storage) {
-	key := common.HexToHash("0x01")
-	value := common.HexToHash("0x02")
-	preimage := []byte("test preimage")
-	preimageHash := crypto.Keccak256Hash(preimage)
-	nonExistentKey := common.HexToHash("0x03")
-	nonExistentPreimageHash := common.HexToHash("0x04")
-	nilPreimageHash := crypto.Keccak256Hash(nil)
+	var (
+		key                     = common.HexToHash("0x01")
+		value                   = common.HexToHash("0x02")
+		preimage                = []byte("test preimage")
+		preimageHash            = crypto.Keccak256Hash(preimage)
+		nonExistentKey          = common.HexToHash("0x03")
+		nonExistentPreimageHash = common.HexToHash("0x04")
+		nilPreimageHash         = crypto.Keccak256Hash(nil)
+	)
 
 	// Test Get with non-existent key
 	storedValue := storage.Get(nonExistentKey)

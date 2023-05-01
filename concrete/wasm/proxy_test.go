@@ -87,16 +87,18 @@ func (s *readWriteStorage) GetPreimageSize(hash common.Hash) int {
 }
 
 func TestStateDBBProxy(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	statedb := cc_test.NewTestStateDB()
-	proxy := newProxyStateDB(statedb)
-	stateApi := cc_api.NewStateAPI(statedb, address)
-	proxyStateApi := cc_api.NewStateAPI(proxy, address)
+	var (
+		address       = common.HexToAddress("0x01")
+		statedb       = cc_test.NewTestStateDB()
+		proxy         = newProxyStateDB(statedb)
+		stateApi      = cc_api.NewStateAPI(statedb, address)
+		proxyStateApi = cc_api.NewStateAPI(proxy, address)
 
-	persistent := stateApi.Persistent()
-	proxyPersistent := proxyStateApi.Persistent()
-	ephemeral := stateApi.Ephemeral()
-	proxyEphemeral := proxyStateApi.Ephemeral()
+		persistent      = stateApi.Persistent()
+		proxyPersistent = proxyStateApi.Persistent()
+		ephemeral       = stateApi.Ephemeral()
+		proxyEphemeral  = proxyStateApi.Ephemeral()
+	)
 
 	// Test persistent methods
 	cc_api_test.TestStorage(t, NewReadWriteStorage(persistent, proxyPersistent))
@@ -150,10 +152,11 @@ func newProxyEVM(evm cc_api.EVM) cc_api.EVM {
 }
 
 func TestEVMBridge(t *testing.T) {
-	db := cc_api_test.NewMockStateDB()
-	evm := newEVMStub(db)
-	proxy := newProxyEVM(evm)
-
+	var (
+		db    = cc_api_test.NewMockStateDB()
+		evm   = newEVMStub(db)
+		proxy = newProxyEVM(evm)
+	)
 	require.Equal(t, evm.BlockHash(common.Big1), proxy.BlockHash(common.Big1))
 	require.Equal(t, evm.BlockTimestamp(), proxy.BlockTimestamp())
 	require.Equal(t, evm.BlockNumber(), proxy.BlockNumber())
