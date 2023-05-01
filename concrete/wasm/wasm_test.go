@@ -72,33 +72,40 @@ func TestStatelessPrecompile(t *testing.T) {
 
 	require.IsType(t, &statelessWasmPrecompile{}, pc)
 
-	// Test MutatesStorage, Finalise, and Commit
-	require.False(t, pc.MutatesStorage([]byte("hello world")))
-	require.NoError(t, pc.Finalise(api))
-	require.NoError(t, pc.Commit(api))
-
-	// Test Run and RequiredGas
+	testMutatesStorage := func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		require.False(t, pc.MutatesStorage([]byte("hello world")))
+	}
+	testFinalise := func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		require.NoError(t, pc.Finalise(api))
+	}
+	testCommit := func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		require.NoError(t, pc.Commit(api))
+	}
 	testRun := func(data []byte, wg *sync.WaitGroup) {
 		defer wg.Done()
 		result, err := pc.Run(api, data)
 		require.NoError(t, err)
 		require.Equal(t, data, result)
 	}
-	testRequiredGas := func(data byte, wg *sync.WaitGroup) {
+	testRequiredGas := func(data []byte, wg *sync.WaitGroup) {
 		defer wg.Done()
-		gas := pc.RequiredGas([]byte{data})
-		require.Equal(t, uint64(data), gas)
+		gas := pc.RequiredGas(data)
+		require.Equal(t, uint64(data[0]), gas)
 	}
 
 	var wg sync.WaitGroup
-	routines := 30
+	routines := 6 * 5
 	wg.Add(routines)
-	for ii := 0; ii < routines; ii++ {
-		if ii%2 == 0 {
-			go testRequiredGas(byte(ii), &wg)
-		} else {
-			go testRun([]byte{byte(ii)}, &wg)
-		}
+	for ii := 0; ii < routines/5; ii++ {
+		data := []byte{byte(ii)}
+		go testMutatesStorage(&wg)
+		go testFinalise(&wg)
+		go testCommit(&wg)
+		go testRun(data, &wg)
+		go testRequiredGas(data, &wg)
 	}
 	wg.Wait()
 }
