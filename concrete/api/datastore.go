@@ -19,6 +19,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/concrete/crypto"
 )
 
 type Datastore interface {
@@ -111,7 +112,7 @@ type mapping struct {
 }
 
 func (m *mapping) key(key common.Hash) common.Hash {
-	return Keccak256Hash(m.id.Bytes(), key.Bytes())
+	return crypto.Keccak256Hash(m.id.Bytes(), key.Bytes())
 }
 
 func (m *mapping) Datastore() Datastore {
@@ -159,7 +160,7 @@ type array struct {
 }
 
 func (a *array) key(index int) common.Hash {
-	return Keccak256Hash(a.id.Bytes(), common.BigToHash(big.NewInt(int64(index))).Bytes())
+	return crypto.Keccak256Hash(a.id.Bytes(), common.BigToHash(big.NewInt(int64(index))).Bytes())
 }
 
 func (a *array) setLength(length int) {
@@ -246,11 +247,11 @@ type set struct {
 }
 
 func (s *set) indexMap() Mapping {
-	return s.ds.NewMap(Keccak256Hash(s.id.Bytes(), []byte{0}))
+	return s.ds.NewMap(crypto.Keccak256Hash(s.id.Bytes(), []byte{0}))
 }
 
 func (s *set) valueArray() Array {
-	return s.ds.NewArray(Keccak256Hash(s.id.Bytes(), []byte{1}))
+	return s.ds.NewArray(crypto.Keccak256Hash(s.id.Bytes(), []byte{1}))
 }
 
 func (s *set) Datastore() Datastore {

@@ -16,19 +16,20 @@
 package api
 
 import (
-	"hash"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"golang.org/x/crypto/sha3"
+	"github.com/ethereum/go-ethereum/concrete/crypto"
 )
 
 var (
-	EmptyPreimageHash = Keccak256Hash(nil) // c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+	// EmptyPreimageHash = crypto.Keccak256Hash(nil)
+	EmptyPreimageHash = common.HexToHash("0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")
 )
 
 var (
-	HashRegistryAddress = common.BytesToAddress(Keccak256([]byte("concrete.HashRegistry.v0")))
+	// HashRegistryAddress = common.BytesToAddress(crypto.Keccak256([]byte("concrete.HashRegistry.v0")))
+	HashRegistryAddress = common.HexToAddress("0x5a1aca093af3a4645ae880200333893724c94e92")
 )
 
 type StateDB interface {
@@ -153,7 +154,7 @@ func (s *PersistentStorage) AddPreimage(preimage []byte) {
 	if len(preimage) == 0 {
 		return
 	}
-	hash := Keccak256Hash(preimage)
+	hash := crypto.Keccak256Hash(preimage)
 	s.db.SetPersistentState(HashRegistryAddress, hash, common.BytesToHash(common.Big1.Bytes()))
 	s.db.AddPersistentPreimage(hash, preimage)
 }
@@ -208,7 +209,7 @@ func (s *EphemeralStorage) AddPreimage(preimage []byte) {
 	if len(preimage) == 0 {
 		return
 	}
-	hash := Keccak256Hash(preimage)
+	hash := crypto.Keccak256Hash(preimage)
 	s.db.SetEphemeralState(HashRegistryAddress, hash, common.BytesToHash(common.Big1.Bytes()))
 	s.db.AddEphemeralPreimage(hash, preimage)
 }
@@ -367,34 +368,4 @@ type Precompile interface {
 	Finalise(api API) error
 	Commit(api API) error
 	Run(api API, input []byte) ([]byte, error)
-}
-
-// Re-implementation of Keccak256Hash so we it can be used from tinyGo
-
-type KeccakState interface {
-	hash.Hash
-	Read([]byte) (int, error)
-}
-
-func NewKeccakState() KeccakState {
-	return sha3.NewLegacyKeccak256().(KeccakState)
-}
-
-func Keccak256(data ...[]byte) []byte {
-	b := make([]byte, 32)
-	d := NewKeccakState()
-	for _, b := range data {
-		d.Write(b)
-	}
-	d.Read(b)
-	return b
-}
-
-func Keccak256Hash(data ...[]byte) (h common.Hash) {
-	d := NewKeccakState()
-	for _, b := range data {
-		d.Write(b)
-	}
-	d.Read(h[:])
-	return h
 }
