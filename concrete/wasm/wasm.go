@@ -249,8 +249,8 @@ func (p *statefulWasmPrecompile) before(api cc_api.API) {
 }
 
 func (p *statefulWasmPrecompile) after(api cc_api.API) {
-	p.mutex.Unlock()
 	p.api = nil
+	p.mutex.Unlock()
 }
 
 func (p *statefulWasmPrecompile) MutatesStorage(input []byte) bool {
