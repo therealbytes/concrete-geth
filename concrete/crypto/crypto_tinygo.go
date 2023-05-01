@@ -18,9 +18,6 @@
 package crypto
 
 import (
-	"fmt"
-	"hash"
-
 	"github.com/ethereum/go-ethereum/common"
 	mem "github.com/ethereum/go-ethereum/tinygo/mem"
 )
@@ -30,8 +27,8 @@ import (
 func _Keccak256Bridge(pointer uint64) uint64
 
 func Keccak256(data ...[]byte) []byte {
-	dataPtr := mem.PutValue(data)
-	hashPtr := _Keccak256Bridge(pointer)
+	dataPtr := mem.PutValues(data)
+	hashPtr := _Keccak256Bridge(dataPtr)
 	return mem.GetValue(hashPtr)
 }
 
