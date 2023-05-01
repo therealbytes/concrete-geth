@@ -19,6 +19,7 @@ import (
 	_ "embed"
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -101,18 +102,24 @@ func testPrecompile(t *testing.T, pcAddr common.Address) {
 	}
 }
 
+var mutex sync.Mutex
+
 func TestNativePrecompile(t *testing.T) {
 	address := common.BytesToAddress([]byte{128})
 	pc := &lib.TypicalPrecompile{}
+	mutex.Lock()
 	err := contracts.AddPrecompile(address, pc)
+	mutex.Unlock()
 	require.NoError(t, err)
 	testPrecompile(t, address)
 }
 
 func TestWasmPrecompile(t *testing.T) {
-	address := common.BytesToAddress([]byte{128})
+	address := common.BytesToAddress([]byte{129})
 	pc := wasm.NewWasmPrecompile(typicalWasm, address)
+	mutex.Lock()
 	err := contracts.AddPrecompile(address, pc)
+	mutex.Unlock()
 	require.NoError(t, err)
 	testPrecompile(t, address)
 }
