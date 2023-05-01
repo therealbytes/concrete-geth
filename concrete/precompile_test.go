@@ -54,8 +54,8 @@ func testPrecompile(t *testing.T, pcAddr common.Address) {
 			BaseFee: big.NewInt(params.InitialBaseFee),
 		}
 		signer  = types.LatestSigner(gspec.Config)
-		nBlocks = 3
-		nTx     = 3
+		nBlocks = 5
+		nTx     = 5
 	)
 
 	hashes := make([]common.Hash, 0, nBlocks)

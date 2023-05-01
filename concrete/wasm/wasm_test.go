@@ -18,11 +18,14 @@ package wasm
 import (
 	"context"
 	_ "embed"
+	"math/rand"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/concrete/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
@@ -120,9 +123,11 @@ func TestStatefulPrecompile(t *testing.T) {
 
 	require.IsType(t, &statefulWasmPrecompile{}, pc)
 
+	runCounterKey := cc_api.Keccak256Hash([]byte("typical.counter.0"))
+
 	var wg sync.WaitGroup
 	routines := 50
-	iterations := 100
+	iterations := 20
 	wg.Add(routines)
 
 	for ii := 0; ii < routines; ii++ {
@@ -131,11 +136,15 @@ func TestStatefulPrecompile(t *testing.T) {
 			statedb := test.NewTestStateDB()
 			evm := test.NewTestEVM(statedb)
 			api := cc_api.New(evm, address)
+			counter := lib.NewCounter(api.Persistent().NewReference(runCounterKey))
+			require.Equal(t, uint64(0), counter.Get().Uint64())
 			for jj := 0; jj < iterations; jj++ {
 				data := []byte{byte(ii), byte(jj)}
 				_, err := pc.Run(api, data)
 				require.NoError(t, err)
+				time.Sleep(time.Duration(rand.Intn(10)) * time.Microsecond)
 			}
+			require.Equal(t, uint64(iterations), counter.Get().Uint64())
 		}(ii)
 	}
 
