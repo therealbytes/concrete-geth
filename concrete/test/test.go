@@ -29,14 +29,6 @@ func NewTestStateDB() vm.StateDB {
 	return db
 }
 
-func NewTestEVMWithStateDB(db vm.StateDB) api.EVM {
+func NewTestEVM(db vm.StateDB) api.EVM {
 	return vm.NewEVM(vm.BlockContext{}, vm.TxContext{}, db, params.TestChainConfig, vm.Config{}).NewConcreteEVM()
-}
-
-func NewTestEVM() api.EVM {
-	return NewTestEVMWithStateDB(NewTestStateDB())
-}
-
-func NewTestAPI(addr common.Address) api.API {
-	return api.New(NewTestEVM(), addr)
 }
