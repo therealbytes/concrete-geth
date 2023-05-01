@@ -13,41 +13,27 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-//go:build tinygo && !link_crypto
+//go:build tinygo && link_crypto
 
 package crypto
 
 import (
-	"hash"
-
 	"github.com/ethereum/go-ethereum/common"
-	"golang.org/x/crypto/sha3"
+	mem "github.com/ethereum/go-ethereum/tinygo/mem"
 )
 
-type KeccakState interface {
-	hash.Hash
-	Read([]byte) (int, error)
-}
-
-func NewKeccakState() KeccakState {
-	return sha3.NewLegacyKeccak256().(KeccakState)
-}
+//go:wasm-module env
+//export concrete_Keccak256Bridge
+func _Keccak256Bridge(pointer uint64) uint64
 
 func Keccak256(data ...[]byte) []byte {
-	b := make([]byte, 32)
-	d := NewKeccakState()
-	for _, b := range data {
-		d.Write(b)
-	}
-	d.Read(b)
-	return b
+	dataPtr := mem.PutValues(data)
+	hashPtr := _Keccak256Bridge(dataPtr)
+	hash := mem.GetValue(hashPtr)
+	// mem.Free(unsafe.Pointer(&hash[0]))
+	return hash
 }
 
 func Keccak256Hash(data ...[]byte) (h common.Hash) {
-	d := NewKeccakState()
-	for _, b := range data {
-		d.Write(b)
-	}
-	d.Read(h[:])
-	return h
+	return common.BytesToHash(Keccak256(data...))
 }

@@ -22,7 +22,7 @@ import (
 )
 
 // We use std.Keccak256Hash instead of crypto.Keccak256Hash because the latter
-// will not compile in tinygo as it depends on a host function.
+// may not compile in tinygo as may depend on a host function.
 var (
 	runCounterKey = std.Keccak256Hash([]byte("typical.counter.0"))
 	hashSetKey    = std.Keccak256Hash([]byte("typical.set.0"))
