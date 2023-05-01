@@ -49,7 +49,7 @@ func TestStatelessWasmBridges(t *testing.T) {
 	}
 
 	mod, r, _ := newModule(&bridgeConfig{addressBridge: bridgeAddress, logBridge: bridgeLog}, logCode)
-	pc := &statelessWasmPrecompile{wasmPrecompile{r, mod, newMutexQueue(1)}}
+	pc := &statelessWasmPrecompile{wasmPrecompile{r: r, mod: mod}}
 	var api cc_api.API
 
 	defer pc.close()

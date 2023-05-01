@@ -100,31 +100,10 @@ func newModule(bridges *bridgeConfig, code []byte) (wz_api.Module, wazero.Runtim
 	return mod, r, nil
 }
 
-type mutexQueue struct {
-	mutex sync.Mutex
-	queue chan struct{}
-}
-
-func newMutexQueue(capacity int) *mutexQueue {
-	return &mutexQueue{
-		queue: make(chan struct{}, capacity),
-	}
-}
-
-func (m *mutexQueue) Lock() {
-	m.queue <- struct{}{}
-	m.mutex.Lock()
-}
-
-func (m *mutexQueue) Unlock() {
-	m.mutex.Unlock()
-	<-m.queue
-}
-
 type wasmPrecompile struct {
 	r     wazero.Runtime
 	mod   wz_api.Module
-	mutex *mutexQueue
+	mutex sync.Mutex
 }
 
 func (p *wasmPrecompile) close() {
@@ -194,8 +173,7 @@ func newStatelessWasmPrecompile(code []byte, address common.Address) *statelessW
 	if err != nil {
 		panic(err)
 	}
-	mutex := newMutexQueue(16)
-	return &statelessWasmPrecompile{wasmPrecompile{r: r, mod: mod, mutex: mutex}}
+	return &statelessWasmPrecompile{wasmPrecompile{r: r, mod: mod}}
 }
 
 func (p *wasmPrecompile) isPure() bool {
@@ -261,7 +239,6 @@ func newStatefulWasmPrecompile(code []byte) *statefulWasmPrecompile {
 
 	pc.r = r
 	pc.mod = mod
-	pc.mutex = newMutexQueue(16)
 
 	return pc
 }
