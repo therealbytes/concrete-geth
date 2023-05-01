@@ -16,6 +16,7 @@
 package concrete
 
 import (
+	_ "embed"
 	"fmt"
 	"math/big"
 	"testing"
@@ -24,6 +25,7 @@ import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/contracts"
 	"github.com/ethereum/go-ethereum/concrete/lib"
+	"github.com/ethereum/go-ethereum/concrete/wasm"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -33,12 +35,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testPrecompile(t *testing.T, pc cc_api.Precompile) {
+//go:embed wasm/bin/typical.wasm
+var typicalWasm []byte
 
+func testPrecompile(t *testing.T, pcAddr common.Address) {
 	var (
-		runCounterKey = cc_api.Keccak256Hash([]byte("stub.counter.0"))
-		hashSetKey    = cc_api.Keccak256Hash([]byte("stub.set.0"))
-		pcAddr        = common.BytesToAddress([]byte{128})
+		runCounterKey = cc_api.Keccak256Hash([]byte("typical.counter.0"))
+		hashSetKey    = cc_api.Keccak256Hash([]byte("typical.set.0"))
 		key, _        = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		address       = crypto.PubkeyToAddress(key.PublicKey)
 		funds         = big.NewInt(1000000000000000)
@@ -54,8 +57,6 @@ func testPrecompile(t *testing.T, pc cc_api.Precompile) {
 		nBlocks = 3
 		nTx     = 3
 	)
-
-	contracts.AddPrecompile(pcAddr, pc)
 
 	hashes := make([]common.Hash, 0, nBlocks)
 	preimages := make([][]byte, 0, nBlocks)
@@ -101,6 +102,17 @@ func testPrecompile(t *testing.T, pc cc_api.Precompile) {
 }
 
 func TestNativePrecompile(t *testing.T) {
+	address := common.BytesToAddress([]byte{128})
 	pc := &lib.TypicalPrecompile{}
-	testPrecompile(t, pc)
+	err := contracts.AddPrecompile(address, pc)
+	require.NoError(t, err)
+	testPrecompile(t, address)
+}
+
+func TestWasmPrecompile(t *testing.T) {
+	address := common.BytesToAddress([]byte{128})
+	pc := wasm.NewWasmPrecompile(typicalWasm, address)
+	err := contracts.AddPrecompile(address, pc)
+	require.NoError(t, err)
+	testPrecompile(t, address)
 }
