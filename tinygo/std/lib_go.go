@@ -19,9 +19,14 @@ package std
 
 import (
 	"fmt"
+
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 func Log(a ...any) uint64 {
 	fmt.Println(a...)
 	return 0
 }
+
+var Keccak256 = crypto.Keccak256
+var Keccak256Hash = crypto.Keccak256Hash
