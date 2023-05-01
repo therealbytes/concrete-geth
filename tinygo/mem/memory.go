@@ -17,7 +17,6 @@ package mem
 
 import (
 	"reflect"
-	"sync"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
@@ -93,7 +92,7 @@ func GetReturnWithError(pointer uint64) ([][]byte, error) {
 	return wasm_mem.GetReturnWithError(Memory, bridge.MemPointer(pointer))
 }
 
-var allocs = sync.Map{}
+var allocs = make(map[uintptr][]byte)
 
 //export concrete_Malloc
 func Malloc(size uintptr) unsafe.Pointer {
@@ -102,7 +101,7 @@ func Malloc(size uintptr) unsafe.Pointer {
 	}
 	buf := make([]byte, size)
 	ptr := unsafe.Pointer(&buf[0])
-	allocs.Store(uintptr(ptr), buf)
+	allocs[uintptr(ptr)] = buf
 	return ptr
 }
 
@@ -111,8 +110,8 @@ func Free(ptr unsafe.Pointer) {
 	if ptr == nil {
 		return
 	}
-	if _, ok := allocs.Load(uintptr(ptr)); ok {
-		allocs.Delete(uintptr(ptr))
+	if _, ok := allocs[uintptr(ptr)]; ok {
+		delete(allocs, uintptr(ptr))
 	} else {
 		panic("free: invalid pointer")
 	}
@@ -120,5 +119,5 @@ func Free(ptr unsafe.Pointer) {
 
 //export concrete_Prune
 func Prune() {
-	allocs = sync.Map{}
+	allocs = make(map[uintptr][]byte)
 }
