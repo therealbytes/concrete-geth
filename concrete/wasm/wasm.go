@@ -29,16 +29,17 @@ import (
 )
 
 var (
-	WASM_IS_PURE         = "concrete_IsPure"
-	WASM_MUTATES_STORAGE = "concrete_MutatesStorage"
-	WASM_REQUIRED_GAS    = "concrete_RequiredGas"
-	WASM_FINALISE        = "concrete_Finalise"
-	WASM_COMMIT          = "concrete_Commit"
-	WASM_RUN             = "concrete_Run"
-	WASM_EVM_BRIDGE      = "concrete_EvmBridge"
-	WASM_STATEDB_BRIDGE  = "concrete_StateDBBridge"
-	WASM_ADDRESS_BRIDGE  = "concrete_AddressBridge"
-	WASM_LOG_BRIDGE      = "concrete_LogBridge"
+	WASM_IS_PURE          = "concrete_IsPure"
+	WASM_MUTATES_STORAGE  = "concrete_MutatesStorage"
+	WASM_REQUIRED_GAS     = "concrete_RequiredGas"
+	WASM_FINALISE         = "concrete_Finalise"
+	WASM_COMMIT           = "concrete_Commit"
+	WASM_RUN              = "concrete_Run"
+	WASM_EVM_BRIDGE       = "concrete_EvmBridge"
+	WASM_STATEDB_BRIDGE   = "concrete_StateDBBridge"
+	WASM_ADDRESS_BRIDGE   = "concrete_AddressBridge"
+	WASM_LOG_BRIDGE       = "concrete_LogBridge"
+	WASM_KECCAK256_BRIDGE = "concrete_Keccak256Bridge"
 )
 
 func NewWasmPrecompile(code []byte, address common.Address) cc_api.Precompile {
@@ -51,10 +52,11 @@ func NewWasmPrecompile(code []byte, address common.Address) cc_api.Precompile {
 }
 
 type bridgeConfig struct {
-	evmBridge     native.NativeBridgeFunc
-	stateDBBridge native.NativeBridgeFunc
-	addressBridge native.NativeBridgeFunc
-	logBridge     native.NativeBridgeFunc
+	evmBridge       native.NativeBridgeFunc
+	stateDBBridge   native.NativeBridgeFunc
+	addressBridge   native.NativeBridgeFunc
+	logBridge       native.NativeBridgeFunc
+	keccak256Bridge native.NativeBridgeFunc
 }
 
 func newModule(bridges *bridgeConfig, code []byte) (wz_api.Module, wazero.Runtime, error) {
@@ -81,12 +83,18 @@ func newModule(bridges *bridgeConfig, code []byte) (wz_api.Module, wazero.Runtim
 		logBridge = native.BridgeLog
 	}
 
+	keccak256Bridge := bridges.keccak256Bridge
+	if keccak256Bridge == nil {
+		keccak256Bridge = native.BridgeKeccak256
+	}
+
 	r := wazero.NewRuntime(ctx)
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(evmBridge).Export(WASM_EVM_BRIDGE).
 		NewFunctionBuilder().WithFunc(stateDBBridge).Export(WASM_STATEDB_BRIDGE).
 		NewFunctionBuilder().WithFunc(addressBridge).Export(WASM_ADDRESS_BRIDGE).
 		NewFunctionBuilder().WithFunc(logBridge).Export(WASM_LOG_BRIDGE).
+		NewFunctionBuilder().WithFunc(keccak256Bridge).Export(WASM_KECCAK256_BRIDGE).
 		Instantiate(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -158,6 +166,11 @@ func (p *wasmPrecompile) before(api cc_api.API) {
 }
 
 func (p *wasmPrecompile) after(api cc_api.API) {
+	ctx := context.Background()
+	err := native.PruneMemory(ctx, p.mod)
+	if err != nil {
+		panic(err)
+	}
 	p.mutex.Unlock()
 }
 
@@ -244,13 +257,13 @@ func newStatefulWasmPrecompile(code []byte) *statefulWasmPrecompile {
 }
 
 func (p *statefulWasmPrecompile) before(api cc_api.API) {
-	p.mutex.Lock()
+	p.wasmPrecompile.before(api)
 	p.api = api
 }
 
 func (p *statefulWasmPrecompile) after(api cc_api.API) {
 	p.api = nil
-	p.mutex.Unlock()
+	p.wasmPrecompile.after(api)
 }
 
 func (p *statefulWasmPrecompile) MutatesStorage(input []byte) bool {

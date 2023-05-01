@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	wz_api "github.com/tetratelabs/wazero/api"
 )
@@ -300,4 +301,10 @@ func BridgeLog(ctx context.Context, module wz_api.Module, pointer uint64) uint64
 	msg := GetValue(ctx, module, bridge.MemPointer(pointer))
 	log.Debug("wasm:", string(msg))
 	return bridge.NullPointer.Uint64()
+}
+
+func BridgeKeccak256(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+	data := GetValue(ctx, module, bridge.MemPointer(pointer))
+	hash := crypto.Keccak256(data)
+	return PutValue(ctx, module, hash).Uint64()
 }
