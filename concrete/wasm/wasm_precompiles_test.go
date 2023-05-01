@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	wz_api "github.com/tetratelabs/wazero/api"
 )
@@ -123,7 +124,7 @@ func TestStatefulPrecompile(t *testing.T) {
 
 	require.IsType(t, &statefulWasmPrecompile{}, pc)
 
-	runCounterKey := cc_api.Keccak256Hash([]byte("typical.counter.0"))
+	runCounterKey := crypto.Keccak256Hash([]byte("typical.counter.0"))
 
 	var wg sync.WaitGroup
 	routines := 50
