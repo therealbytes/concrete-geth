@@ -17,11 +17,15 @@ package lib
 
 import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/crypto"
+	"github.com/ethereum/go-ethereum/tinygo/std"
 )
 
+// We use std.Keccak256Hash instead of crypto.Keccak256Hash because the latter
+// will not compile in tinygo as it depends on a host function.
 var (
-	runCounterKey = cc_api.Keccak256Hash([]byte("typical.counter.0"))
-	hashSetKey    = cc_api.Keccak256Hash([]byte("typical.set.0"))
+	runCounterKey = std.Keccak256Hash([]byte("typical.counter.0"))
+	hashSetKey    = std.Keccak256Hash([]byte("typical.set.0"))
 )
 
 type TypicalPrecompile struct{}
@@ -59,7 +63,7 @@ func (pc *TypicalPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
 
 	hashSet := per.NewSet(hashSetKey)
 	newHashesSet := eph.NewSet(hashSetKey)
-	hash := cc_api.Keccak256Hash(input)
+	hash := crypto.Keccak256Hash(input)
 	hashSet.Add(hash)
 	newHashesSet.Add(hash)
 	eph.AddPreimage(input)

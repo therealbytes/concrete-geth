@@ -16,102 +16,25 @@
 package wasm
 
 import (
-	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm/mem"
 )
 
 type WasmBridgeFunc func(pointer uint64) uint64
 
-type Memory interface {
-	Ref(data []byte) bridge.MemPointer
-	Deref(pointer bridge.MemPointer) []byte
-}
-
-func PutValue(memory Memory, value []byte) bridge.MemPointer {
-	return memory.Ref(value)
-}
-
-func GetValue(memory Memory, pointer bridge.MemPointer) []byte {
-	return memory.Deref(pointer)
-}
-
-func PutValues(memory Memory, values [][]byte) bridge.MemPointer {
-	if len(values) == 0 {
-		return bridge.NullPointer
-	}
-	var pointers []bridge.MemPointer
-	for _, v := range values {
-		pointers = append(pointers, PutValue(memory, v))
-	}
-	packedPointers := bridge.PackPointers(pointers)
-	return PutValue(memory, packedPointers)
-}
-
-func GetValues(memory Memory, pointer bridge.MemPointer) [][]byte {
-	if pointer.IsNull() {
-		return [][]byte{}
-	}
-	var values [][]byte
-	valPointers := bridge.UnpackPointers(GetValue(memory, pointer))
-	for _, p := range valPointers {
-		values = append(values, GetValue(memory, p))
-	}
-	return values
-}
-
-func PutArgs(memory Memory, args [][]byte) bridge.MemPointer {
-	return PutValues(memory, args)
-}
-
-func GetArgs(memory Memory, pointer bridge.MemPointer) [][]byte {
-	return GetValues(memory, pointer)
-}
-
-func PutReturn(memory Memory, retValues [][]byte) bridge.MemPointer {
-	return PutValues(memory, retValues)
-}
-
-func GetReturn(memory Memory, retPointer bridge.MemPointer) [][]byte {
-	return GetValues(memory, retPointer)
-}
-
-func PutReturnWithError(memory Memory, retValues [][]byte, retErr error) bridge.MemPointer {
-	if retErr == nil {
-		errFlag := []byte{bridge.Err_Success}
-		retValues = append([][]byte{errFlag}, retValues...)
-	} else {
-		errFlag := []byte{bridge.Err_Error}
-		errMsg := []byte(retErr.Error())
-		retValues = append([][]byte{errFlag, errMsg}, retValues...)
-	}
-	return PutReturn(memory, retValues)
-}
-
-func GetReturnWithError(memory Memory, retPointer bridge.MemPointer) ([][]byte, error) {
-	retValues := GetReturn(memory, retPointer)
-	if len(retValues) == 0 {
-		return nil, nil
-	}
-	if retValues[0][0] == bridge.Err_Success {
-		return retValues[1:], nil
-	} else {
-		return retValues[2:], errors.New(string(retValues[1]))
-	}
-}
-
 type Proxy struct {
-	memory     Memory
+	memory     mem.Memory
 	bridgeFunc WasmBridgeFunc
 }
 
 func (p *Proxy) call(args ...[]byte) []byte {
-	argsPointer := PutArgs(p.memory, args)
+	argsPointer := mem.PutArgs(p.memory, args)
 	retPointer := bridge.MemPointer(p.bridgeFunc(argsPointer.Uint64()))
-	retValue := GetValue(p.memory, retPointer)
+	retValue := mem.GetValue(p.memory, retPointer)
 	return retValue
 }
 
@@ -119,7 +42,7 @@ type ProxyStateDB struct {
 	Proxy
 }
 
-func NewProxyStateDB(memory Memory, stateDBBridge WasmBridgeFunc) *ProxyStateDB {
+func NewProxyStateDB(memory mem.Memory, stateDBBridge WasmBridgeFunc) *ProxyStateDB {
 	return &ProxyStateDB{Proxy{memory: memory, bridgeFunc: stateDBBridge}}
 }
 
@@ -211,7 +134,7 @@ type ProxyEVM struct {
 	db *ProxyStateDB
 }
 
-func NewProxyEVM(memory Memory, evmBridge WasmBridgeFunc, stateDBBridge WasmBridgeFunc) *ProxyEVM {
+func NewProxyEVM(memory mem.Memory, evmBridge WasmBridgeFunc, stateDBBridge WasmBridgeFunc) *ProxyEVM {
 	return &ProxyEVM{
 		Proxy: Proxy{memory: memory, bridgeFunc: evmBridge},
 		db:    NewProxyStateDB(memory, stateDBBridge),

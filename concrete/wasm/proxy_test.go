@@ -26,22 +26,23 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm/mem"
 	"github.com/stretchr/testify/require"
 )
 
-func newStateDBBridgeFunc(memory wasm.Memory, db cc_api.StateDB) wasm.WasmBridgeFunc {
+func newStateDBBridgeFunc(memory mem.Memory, db cc_api.StateDB) wasm.WasmBridgeFunc {
 	return func(pointer uint64) uint64 {
-		args := wasm.GetArgs(memory, bridge.MemPointer(pointer))
+		args := mem.GetArgs(memory, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
 		opcode.Decode(args[0])
 		args = args[1:]
 		out := native.CallStateDB(db, opcode, args)
-		return wasm.PutValue(memory, out).Uint64()
+		return mem.PutValue(memory, out).Uint64()
 	}
 }
 
 func newProxyStateDB(db cc_api.StateDB) cc_api.StateDB {
-	mem := wasm.NewMockMemory()
+	mem := mem.NewMockMemory()
 	bridgeFunc := newStateDBBridgeFunc(mem, db)
 	return wasm.NewProxyStateDB(mem, bridgeFunc)
 }
@@ -130,19 +131,19 @@ func (m *mockEVM) BlockCoinbase() common.Address        { return common.Address{
 
 var _ cc_api.EVM = &mockEVM{}
 
-func newEVMBridgeFunc(memory wasm.Memory, evm cc_api.EVM) wasm.WasmBridgeFunc {
+func newEVMBridgeFunc(memory mem.Memory, evm cc_api.EVM) wasm.WasmBridgeFunc {
 	return func(pointer uint64) uint64 {
-		args := wasm.GetArgs(memory, bridge.MemPointer(pointer))
+		args := mem.GetArgs(memory, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
 		opcode.Decode(args[0])
 		args = args[1:]
 		out := native.CallEVM(evm, opcode, args)
-		return wasm.PutValue(memory, out).Uint64()
+		return mem.PutValue(memory, out).Uint64()
 	}
 }
 
 func newProxyEVM(evm cc_api.EVM) cc_api.EVM {
-	mem := wasm.NewMockMemory()
+	mem := mem.NewMockMemory()
 	stateDBBridgeFunc := newStateDBBridgeFunc(mem, evm.StateDB())
 	evmBridgeFunc := newEVMBridgeFunc(mem, evm)
 	return wasm.NewProxyEVM(mem, evmBridgeFunc, stateDBBridgeFunc)
