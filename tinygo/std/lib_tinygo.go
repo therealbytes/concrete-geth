@@ -19,47 +19,21 @@ package std
 
 import (
 	"fmt"
-	"hash"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/concrete/crypto"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
 	"github.com/ethereum/go-ethereum/tinygo/mem"
-	"golang.org/x/crypto/sha3"
 )
 
 //go:wasm-module env
-//export concrete_LogBridge
-func _LogBridge(pointer uint64) uint64
+//export concrete_LogCaller
+func _LogCaller(pointer uint64) uint64
 
-func Log(a ...any) uint64 {
-	msg := fmt.Sprintln(a...)
-	pointer := mem.PutValue([]byte(msg[:len(msg)-1]))
-	return _LogBridge(pointer)
+func Log(a ...any) {
+	msg := []byte(fmt.Sprintln(a...))
+	data := [][]byte{msg[:len(msg)-1]}
+	wasm.Call_BytesArr_Bytes(mem.Memory, mem.Allocator, func(pointer uint64) uint64 { return _LogCaller(pointer) }, data...)
 }
 
-type KeccakState interface {
-	hash.Hash
-	Read([]byte) (int, error)
-}
-
-func NewKeccakState() KeccakState {
-	return sha3.NewLegacyKeccak256().(KeccakState)
-}
-
-func Keccak256(data ...[]byte) []byte {
-	b := make([]byte, 32)
-	d := NewKeccakState()
-	for _, b := range data {
-		d.Write(b)
-	}
-	d.Read(b)
-	return b
-}
-
-func Keccak256Hash(data ...[]byte) (h common.Hash) {
-	d := NewKeccakState()
-	for _, b := range data {
-		d.Write(b)
-	}
-	d.Read(h[:])
-	return h
-}
+var Keccak256 = crypto.ReimplementedKeccak256
+var Keccak256Hash = crypto.ReimplementedKeccak256Hash

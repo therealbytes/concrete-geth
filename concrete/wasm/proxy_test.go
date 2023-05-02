@@ -26,25 +26,25 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm/mem"
 	"github.com/stretchr/testify/require"
 )
 
-func newStateDBBridgeFunc(memory mem.Memory, db cc_api.StateDB) wasm.WasmBridgeFunc {
+func NewStateDBHostFunc(mem bridge.Memory, db cc_api.StateDB) wasm.HostFuncCaller {
 	return func(pointer uint64) uint64 {
-		args := mem.GetArgs(memory, bridge.MemPointer(pointer))
+		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
 		opcode.Decode(args[0])
 		args = args[1:]
 		out := native.CallStateDB(db, opcode, args)
-		return mem.PutValue(memory, out).Uint64()
+		return bridge.PutValue(mem, out).Uint64()
 	}
 }
 
 func newProxyStateDB(db cc_api.StateDB) cc_api.StateDB {
-	mem := mem.NewMockMemory()
-	bridgeFunc := newStateDBBridgeFunc(mem, db)
-	return wasm.NewProxyStateDB(mem, bridgeFunc)
+	mem := newMockMemory()
+	alloc := newMockAllocator()
+	caller := NewStateDBHostFunc(mem, db)
+	return wasm.NewProxyStateDB(mem, alloc, caller)
 }
 
 type readWriteStorage struct {
@@ -133,29 +133,30 @@ func (m *mockEVM) BlockCoinbase() common.Address        { return common.Address{
 
 var _ cc_api.EVM = &mockEVM{}
 
-func newEVMBridgeFunc(memory mem.Memory, evm cc_api.EVM) wasm.WasmBridgeFunc {
+func NewEVMHostFunc(mem bridge.Memory, evm cc_api.EVM) wasm.HostFuncCaller {
 	return func(pointer uint64) uint64 {
-		args := mem.GetArgs(memory, bridge.MemPointer(pointer))
+		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
 		opcode.Decode(args[0])
 		args = args[1:]
 		out := native.CallEVM(evm, opcode, args)
-		return mem.PutValue(memory, out).Uint64()
+		return bridge.PutValue(mem, out).Uint64()
 	}
 }
 
 func newProxyEVM(evm cc_api.EVM) cc_api.EVM {
-	mem := mem.NewMockMemory()
-	stateDBBridgeFunc := newStateDBBridgeFunc(mem, evm.StateDB())
-	evmBridgeFunc := newEVMBridgeFunc(mem, evm)
-	return wasm.NewProxyEVM(mem, evmBridgeFunc, stateDBBridgeFunc)
+	mem := newMockMemory()
+	alloc := newMockAllocator()
+	stateDBCaller := NewStateDBHostFunc(mem, evm.StateDB())
+	evmCaller := NewEVMHostFunc(mem, evm)
+	return wasm.NewProxyEVM(mem, alloc, evmCaller, stateDBCaller)
 }
 
-func TestEVMBridge(t *testing.T) {
+func TestEVMProxy(t *testing.T) {
 	var (
-		db    = cc_api_test.NewMockStateDB()
-		evm   = newEVMStub(db)
-		proxy = newProxyEVM(evm)
+		statedb = cc_api_test.NewMockStateDB()
+		evm     = newEVMStub(statedb)
+		proxy   = newProxyEVM(evm)
 	)
 	require.Equal(t, evm.BlockHash(common.Big1), proxy.BlockHash(common.Big1))
 	require.Equal(t, evm.BlockTimestamp(), proxy.BlockTimestamp())

@@ -23,9 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func Log(a ...any) uint64 {
+func Log(a ...any) {
 	fmt.Println(a...)
-	return 0
 }
 
 var Keccak256 = crypto.Keccak256

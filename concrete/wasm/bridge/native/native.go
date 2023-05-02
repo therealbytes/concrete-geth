@@ -21,7 +21,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/concrete/api"
+	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -38,157 +38,146 @@ var (
 	WASM_PRUNE  = "concrete_Prune"
 )
 
-type NativeBridgeFunc func(ctx context.Context, module wz_api.Module, pointer uint64) uint64
+type allocator struct {
+	ctx       context.Context
+	mod       wz_api.Module
+	expMalloc wz_api.Function
+	expFree   wz_api.Function
+	expPrune  wz_api.Function
+}
 
-func AllocMemory(ctx context.Context, module wz_api.Module, size uint32) (bridge.MemPointer, error) {
+func NewAllocator(ctx context.Context, mod wz_api.Module) bridge.Allocator {
+	return &allocator{ctx: ctx, mod: mod}
+}
+
+func (a *allocator) Malloc(size uint32) bridge.MemPointer {
 	if size == 0 {
-		return bridge.NullPointer, nil
+		return bridge.NullPointer
 	}
-	_offset, err := module.ExportedFunction(WASM_MALLOC).Call(ctx, uint64(size))
+	if a.expMalloc == nil {
+		a.expMalloc = a.mod.ExportedFunction(WASM_MALLOC)
+	}
+	_offset, err := a.expMalloc.Call(a.ctx, uint64(size))
 	if err != nil {
-		return bridge.NullPointer, err
+		panic(err)
 	}
 	var pointer bridge.MemPointer
 	pointer.Pack(uint32(_offset[0]), size)
-	return pointer, nil
-}
-
-func FreeMemory(ctx context.Context, module wz_api.Module, pointer bridge.MemPointer) error {
-	if pointer.IsNull() {
-		return nil
-	}
-	_, err := module.ExportedFunction(WASM_FREE).Call(ctx, uint64(pointer.Offset()))
-	return err
-}
-
-func PruneMemory(ctx context.Context, module wz_api.Module) error {
-	_, err := module.ExportedFunction(WASM_PRUNE).Call(ctx)
-	return err
-}
-
-func WriteMemory(ctx context.Context, module wz_api.Module, data []byte) (bridge.MemPointer, error) {
-	if len(data) == 0 {
-		return bridge.NullPointer, nil
-	}
-	pointer, err := AllocMemory(ctx, module, uint32(len(data)))
-	if err != nil {
-		return bridge.NullPointer, err
-	}
-	ok := module.Memory().Write(pointer.Offset(), data)
-	if !ok {
-		return bridge.NullPointer, ErrMemoryReadOutOfRange
-	}
-	return pointer, nil
-}
-
-func ReadMemory(ctx context.Context, module wz_api.Module, pointer bridge.MemPointer) ([]byte, error) {
-	if pointer.IsNull() {
-		return []byte{}, nil
-	}
-	output, ok := module.Memory().Read(pointer.Offset(), pointer.Size())
-	if !ok {
-		return nil, ErrMemoryReadOutOfRange
-	}
-	return output, nil
-}
-
-func PutValue(ctx context.Context, module wz_api.Module, value []byte) bridge.MemPointer {
-	pointer, err := WriteMemory(ctx, module, value)
-	if err != nil {
-		panic(err)
-	}
 	return pointer
 }
 
-func GetValue(ctx context.Context, module wz_api.Module, pointer bridge.MemPointer) []byte {
-	value, err := ReadMemory(ctx, module, pointer)
+func (a *allocator) Free(pointer bridge.MemPointer) {
+	if pointer.IsNull() {
+		return
+	}
+	if a.expFree == nil {
+		a.expFree = a.mod.ExportedFunction(WASM_FREE)
+	}
+	_, err := a.expFree.Call(a.ctx, uint64(pointer.Offset()))
 	if err != nil {
 		panic(err)
 	}
-	return value
 }
 
-func PutValues(ctx context.Context, module wz_api.Module, values [][]byte) bridge.MemPointer {
-	if len(values) == 0 {
+func (a *allocator) Prune() {
+	if a.expPrune == nil {
+		a.expPrune = a.mod.ExportedFunction(WASM_PRUNE)
+	}
+	_, err := a.expPrune.Call(a.ctx)
+	if err != nil {
+		panic(err)
+	}
+}
+
+type memory struct {
+	allocator
+}
+
+func NewMemory(ctx context.Context, mod wz_api.Module) (bridge.Memory, bridge.Allocator) {
+	alloc := &allocator{ctx: ctx, mod: mod}
+	return &memory{allocator: *alloc}, alloc
+}
+
+func NewMemoryFromAlloc(alloc *allocator) bridge.Allocator {
+	return &memory{*alloc}
+}
+
+func (m *memory) Write(data []byte) bridge.MemPointer {
+	if len(data) == 0 {
 		return bridge.NullPointer
 	}
-	var pointers []bridge.MemPointer
-	for _, v := range values {
-		pointer := PutValue(ctx, module, v)
-		pointers = append(pointers, pointer)
+	pointer := m.Malloc(uint32(len(data)))
+	ok := m.mod.Memory().Write(pointer.Offset(), data)
+	if !ok {
+		panic(ErrMemoryReadOutOfRange)
 	}
-	pointer := PutValue(ctx, module, bridge.PackPointers(pointers))
 	return pointer
 }
 
-func GetValues(ctx context.Context, module wz_api.Module, pointer bridge.MemPointer) [][]byte {
+func (m *memory) Read(pointer bridge.MemPointer) []byte {
 	if pointer.IsNull() {
-		return [][]byte{}
+		return []byte{}
 	}
-	encodedPointers := GetValue(ctx, module, pointer)
-	var values [][]byte
-	valPointers := bridge.UnpackPointers(encodedPointers)
-	for _, p := range valPointers {
-		v := GetValue(ctx, module, p)
-		values = append(values, v)
+	output, ok := m.mod.Memory().Read(pointer.Offset(), pointer.Size())
+	if !ok {
+		panic(ErrMemoryReadOutOfRange)
 	}
-	return values
+	return output
 }
 
-func PutArgs(ctx context.Context, module wz_api.Module, args [][]byte) bridge.MemPointer {
-	return PutValues(ctx, module, args)
-}
+type HostFunc func(ctx context.Context, module wz_api.Module, pointer uint64) uint64
 
-func GetArgs(ctx context.Context, module wz_api.Module, pointer bridge.MemPointer) [][]byte {
-	return GetValues(ctx, module, pointer)
-}
-
-func PutReturn(ctx context.Context, module wz_api.Module, retValues [][]byte) bridge.MemPointer {
-	return PutValues(ctx, module, retValues)
-}
-
-func GetReturn(ctx context.Context, module wz_api.Module, retPointer bridge.MemPointer) [][]byte {
-	return GetValues(ctx, module, retPointer)
-}
-
-func PutReturnWithError(ctx context.Context, module wz_api.Module, retValues [][]byte, retErr error) bridge.MemPointer {
-	if retErr == nil {
-		errFlag := []byte{bridge.Err_Success}
-		retValues = append([][]byte{errFlag}, retValues...)
-	} else {
-		errFlag := []byte{bridge.Err_Error}
-		errMsg := []byte(retErr.Error())
-		retValues = append([][]byte{errFlag, errMsg}, retValues...)
-	}
-	return PutValues(ctx, module, retValues)
-}
-
-func GetReturnWithError(ctx context.Context, module wz_api.Module, retPointer bridge.MemPointer) ([][]byte, error) {
-	retValues := GetReturn(ctx, module, retPointer)
-	if len(retValues) == 0 {
-		return [][]byte{}, nil
-	}
-	if retValues[0][0] == bridge.Err_Success {
-		return retValues[1:], nil
-	} else {
-		return retValues[2:], errors.New(string(retValues[1]))
+func NewStateDBHostFunc(apiGetter func() cc_api.API) HostFunc {
+	return func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+		mem, _ := NewMemory(ctx, module)
+		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
+		var opcode bridge.OpCode
+		opcode.Decode(args[0])
+		args = args[1:]
+		out := CallStateDB(apiGetter().StateDB(), opcode, args)
+		ptr := bridge.PutValue(mem, out).Uint64()
+		return ptr
 	}
 }
 
-func DisabledBridge(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-	panic("go: disabled bridge -- this likely means you are trying to access the concrete API from a wasm precompile declared as pure")
+func NewEVMHostFunc(apiGetter func() cc_api.API) HostFunc {
+	return func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+		mem, _ := NewMemory(ctx, module)
+		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
+		var opcode bridge.OpCode
+		opcode.Decode(args[0])
+		args = args[1:]
+		out := CallEVM(apiGetter().EVM(), opcode, args)
+		return bridge.PutValue(mem, out).Uint64()
+	}
 }
 
-func BridgeCallStateDB(ctx context.Context, module wz_api.Module, pointer uint64, db api.StateDB) uint64 {
-	args := GetArgs(ctx, module, bridge.MemPointer(pointer))
-	var opcode bridge.OpCode
-	opcode.Decode(args[0])
-	args = args[1:]
-	out := CallStateDB(db, opcode, args)
-	return PutValue(ctx, module, out).Uint64()
+func NewAddressHostFunc(address common.Address) HostFunc {
+	return func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+		mem, _ := NewMemory(ctx, module)
+		return bridge.PutValue(mem, address.Bytes()).Uint64()
+	}
 }
 
-func CallStateDB(db api.StateDB, opcode bridge.OpCode, args [][]byte) []byte {
+func DisabledHostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+	panic("go: disabled host function -- this likely means you are trying to access the concrete API from a wasm precompile declared as pure")
+}
+
+func LogHostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+	mem, _ := NewMemory(ctx, module)
+	_msg := bridge.GetValues(mem, bridge.MemPointer(pointer))
+	log.Debug("wasm:", string(_msg[0]))
+	return bridge.NullPointer.Uint64()
+}
+
+func Keccak256HostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+	mem, _ := NewMemory(ctx, module)
+	data := bridge.GetValues(mem, bridge.MemPointer(pointer))
+	hash := crypto.Keccak256(data...)
+	return bridge.PutValue(mem, hash).Uint64()
+}
+
+func CallStateDB(db cc_api.StateDB, opcode bridge.OpCode, args [][]byte) []byte {
 	switch opcode {
 	case bridge.Op_StateDB_GetPersistentState:
 		addr := common.BytesToAddress(args[0])
@@ -248,16 +237,7 @@ func CallStateDB(db api.StateDB, opcode bridge.OpCode, args [][]byte) []byte {
 	return nil
 }
 
-func BridgeCallEVM(ctx context.Context, module wz_api.Module, pointer uint64, evm api.EVM) uint64 {
-	args := GetArgs(ctx, module, bridge.MemPointer(pointer))
-	var opcode bridge.OpCode
-	opcode.Decode(args[0])
-	args = args[1:]
-	out := CallEVM(evm, opcode, args)
-	return PutValue(ctx, module, out).Uint64()
-}
-
-func CallEVM(evm api.EVM, opcode bridge.OpCode, args [][]byte) []byte {
+func CallEVM(evm cc_api.EVM, opcode bridge.OpCode, args [][]byte) []byte {
 	switch opcode {
 	case bridge.Op_EVM_BlockHash:
 		block := new(big.Int).SetBytes(args[0])
@@ -286,25 +266,4 @@ func CallEVM(evm api.EVM, opcode bridge.OpCode, args [][]byte) []byte {
 	}
 
 	return nil
-}
-
-func BridgeAddress(ctx context.Context, module wz_api.Module, pointer uint64, addr common.Address) uint64 {
-	return PutValue(ctx, module, addr.Bytes()).Uint64()
-}
-
-func BridgeAddress0(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-	addr := common.Address{}
-	return PutValue(ctx, module, addr.Bytes()).Uint64()
-}
-
-func BridgeLog(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-	msg := GetValue(ctx, module, bridge.MemPointer(pointer))
-	log.Debug("wasm:", string(msg))
-	return bridge.NullPointer.Uint64()
-}
-
-func BridgeKeccak256(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-	data := GetValues(ctx, module, bridge.MemPointer(pointer))
-	hash := crypto.Keccak256(data...)
-	return PutValue(ctx, module, hash).Uint64()
 }

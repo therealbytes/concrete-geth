@@ -13,41 +13,39 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package mem
+package crypto
 
 import (
-	"errors"
+	"hash"
 
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
+	"github.com/ethereum/go-ethereum/common"
+	"golang.org/x/crypto/sha3"
 )
 
-type memory map[uint64][]byte
-
-func NewMockMemory() Memory {
-	return &memory{}
+type keccakState interface {
+	hash.Hash
+	Read([]byte) (int, error)
 }
 
-func (m memory) Ref(data []byte) bridge.MemPointer {
-	if len(data) == 0 {
-		return bridge.NullPointer
-	}
-	offset := uint32(len(m))
-	size := uint32(len(data))
-	var pointer bridge.MemPointer
-	pointer.Pack(offset, size)
-	m[pointer.Uint64()] = data
-	return pointer
+func newKeccakState() keccakState {
+	return sha3.NewLegacyKeccak256().(keccakState)
 }
 
-func (m memory) Deref(pointer bridge.MemPointer) []byte {
-	if pointer.IsNull() {
-		return []byte{}
+func ReimplementedKeccak256(data ...[]byte) []byte {
+	b := make([]byte, 32)
+	d := newKeccakState()
+	for _, b := range data {
+		d.Write(b)
 	}
-	data, ok := m[pointer.Uint64()]
-	if !ok {
-		panic(errors.New("invalid pointer"))
-	}
-	return data
+	d.Read(b)
+	return b
 }
 
-var _ Memory = make(memory)
+func ReimplementedKeccak256Hash(data ...[]byte) (h common.Hash) {
+	d := newKeccakState()
+	for _, b := range data {
+		d.Write(b)
+	}
+	d.Read(h[:])
+	return h
+}

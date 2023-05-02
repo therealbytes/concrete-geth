@@ -20,12 +20,39 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
-	wasm_mem "github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm/mem"
 )
+
+var allocs = make(map[uintptr][]byte)
+
+//export concrete_Malloc
+func Malloc(size uint64) uint64 {
+	if size == 0 {
+		return 0
+	}
+	buf := make([]byte, size)
+	ptr := uintptr(unsafe.Pointer(&buf[0]))
+	allocs[ptr] = buf
+	return uint64(ptr)
+}
+
+//export concrete_Free
+func Free(pointer uint64) {
+	ptr := uintptr(pointer)
+	if _, ok := allocs[ptr]; ok {
+		delete(allocs, ptr)
+	} else {
+		panic("free: invalid pointer")
+	}
+}
+
+//export concrete_Prune
+func Prune() {
+	allocs = make(map[uintptr][]byte)
+}
 
 type memory struct{}
 
-func (m *memory) Ref(data []byte) bridge.MemPointer {
+func (m *memory) Write(data []byte) bridge.MemPointer {
 	if len(data) == 0 {
 		return bridge.NullPointer
 	}
@@ -36,7 +63,7 @@ func (m *memory) Ref(data []byte) bridge.MemPointer {
 	return pointer
 }
 
-func (m *memory) Deref(pointer bridge.MemPointer) []byte {
+func (m *memory) Read(pointer bridge.MemPointer) []byte {
 	if pointer.IsNull() {
 		return []byte{}
 	}
@@ -50,74 +77,23 @@ func (m *memory) Deref(pointer bridge.MemPointer) []byte {
 	}))
 }
 
-var Memory wasm_mem.Memory = &memory{}
+var Memory bridge.Memory = &memory{}
 
-func PutValue(value []byte) uint64 {
-	return uint64(wasm_mem.PutValue(Memory, value))
+type allocator struct{}
+
+func (m *allocator) Malloc(size uint32) bridge.MemPointer {
+	offset := Malloc(uint64(size))
+	var pointer bridge.MemPointer
+	pointer.Pack(uint32(offset), size)
+	return pointer
 }
 
-func GetValue(pointer uint64) []byte {
-	return wasm_mem.GetValue(Memory, bridge.MemPointer(pointer))
+func (m *allocator) Free(pointer bridge.MemPointer) {
+	Free(uint64(pointer.Offset()))
 }
 
-func PutValues(values [][]byte) uint64 {
-	return uint64(wasm_mem.PutValues(Memory, values))
+func (m *allocator) Prune() {
+	Prune()
 }
 
-func GetValues(pointer uint64) [][]byte {
-	return wasm_mem.GetValues(Memory, bridge.MemPointer(pointer))
-}
-
-func PutArgs(values [][]byte) uint64 {
-	return uint64(wasm_mem.PutArgs(Memory, values))
-}
-
-func GetArgs(pointer uint64) [][]byte {
-	return wasm_mem.GetArgs(Memory, bridge.MemPointer(pointer))
-}
-
-func PutReturn(values [][]byte) uint64 {
-	return uint64(wasm_mem.PutReturn(Memory, values))
-}
-
-func GetReturn(pointer uint64) [][]byte {
-	return wasm_mem.GetReturn(Memory, bridge.MemPointer(pointer))
-}
-
-func PutReturnWithError(values [][]byte, err error) uint64 {
-	return uint64(wasm_mem.PutReturnWithError(Memory, values, err))
-}
-
-func GetReturnWithError(pointer uint64) ([][]byte, error) {
-	return wasm_mem.GetReturnWithError(Memory, bridge.MemPointer(pointer))
-}
-
-var allocs = make(map[uintptr][]byte)
-
-//export concrete_Malloc
-func Malloc(size uintptr) unsafe.Pointer {
-	if size == 0 {
-		return nil
-	}
-	buf := make([]byte, size)
-	ptr := unsafe.Pointer(&buf[0])
-	allocs[uintptr(ptr)] = buf
-	return ptr
-}
-
-//export concrete_Free
-func Free(ptr unsafe.Pointer) {
-	if ptr == nil {
-		return
-	}
-	if _, ok := allocs[uintptr(ptr)]; ok {
-		delete(allocs, uintptr(ptr))
-	} else {
-		panic("free: invalid pointer")
-	}
-}
-
-//export concrete_Prune
-func Prune() {
-	allocs = make(map[uintptr][]byte)
-}
+var Allocator bridge.Allocator = &allocator{}

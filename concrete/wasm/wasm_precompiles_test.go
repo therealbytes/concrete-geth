@@ -43,34 +43,39 @@ var logCode []byte
 //go:embed bin/typical.wasm
 var typicalCode []byte
 
-func TestStatelessWasmBridges(t *testing.T) {
+func TestWasmLog(t *testing.T) {
 	address := common.HexToAddress("0x01")
+	statedb := test.NewTestStateDB()
+	evm := test.NewTestEVM(statedb)
+	api := cc_api.New(evm, address)
+	hostConfig := newHostConfig()
 
 	var lastLog string
-	bridgeLog := func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-		msg := native.GetValue(ctx, module, bridge.MemPointer(pointer))
-		lastLog = string(msg)
+	hostConfig.log = func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+		mem, _ := native.NewMemory(ctx, module)
+		_msg := bridge.GetValues(mem, bridge.MemPointer(pointer))
+		lastLog = string(_msg[0])
 		return bridge.NullPointer.Uint64()
 	}
-	bridgeAddress := func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-		return native.PutValue(ctx, module, address.Bytes()).Uint64()
-	}
+	hostConfig.address = native.NewAddressHostFunc(address)
 
-	mod, r, _ := newModule(&bridgeConfig{addressBridge: bridgeAddress, logBridge: bridgeLog}, logCode)
-	pc := &statelessWasmPrecompile{wasmPrecompile{r: r, mod: mod}}
-	var api cc_api.API
+	ctx := context.Background()
+	mod, r, err := newModule(hostConfig, logCode)
+	require.NoError(t, err)
 
+	pc := &wasmPrecompile{}
+	pc.r = r
+	pc.mod = mod
+	pc.memory, pc.allocator = native.NewMemory(ctx, mod)
+	pc.expRun = mod.ExportedFunction(WASM_RUN)
 	defer pc.close()
 
-	// Test Log
 	str1 := "hello world"
 	str2 := "bye world"
 	pc.Run(api, []byte(str1))
 	require.Equal(t, str1, lastLog)
 	pc.Run(api, []byte(str2))
 	require.Equal(t, str2, lastLog)
-
-	// Test Address
 }
 
 func TestStatelessPrecompile(t *testing.T) {
@@ -122,7 +127,7 @@ func TestStatefulPrecompile(t *testing.T) {
 	address := common.HexToAddress("0x01")
 	pc := NewWasmPrecompile(typicalCode, address)
 
-	require.IsType(t, &statefulWasmPrecompile{}, pc)
+	require.IsType(t, &wasmPrecompile{}, pc)
 
 	runCounterKey := crypto.Keccak256Hash([]byte("typical.counter.0"))
 

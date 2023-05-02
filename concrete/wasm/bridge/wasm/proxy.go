@@ -21,33 +21,41 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm/mem"
 )
 
-type WasmBridgeFunc func(pointer uint64) uint64
+type HostFuncCaller func(pointer uint64) uint64
+
+func Call_BytesArr_Bytes(memory bridge.Memory, allocator bridge.Allocator, caller HostFuncCaller, args ...[]byte) []byte {
+	argsPointer := bridge.PutArgs(memory, args)
+	retPointer := bridge.MemPointer(caller(argsPointer.Uint64()))
+	retValue := bridge.GetValue(memory, retPointer)
+	if !retPointer.IsNull() {
+		allocator.Free(retPointer)
+	}
+	return retValue
+}
 
 type Proxy struct {
-	memory     mem.Memory
-	bridgeFunc WasmBridgeFunc
+	memory    bridge.Memory
+	allocator bridge.Allocator
+	caller    HostFuncCaller
 }
 
 func (p *Proxy) call(args ...[]byte) []byte {
-	argsPointer := mem.PutArgs(p.memory, args)
-	retPointer := bridge.MemPointer(p.bridgeFunc(argsPointer.Uint64()))
-	retValue := mem.GetValue(p.memory, retPointer)
-	return retValue
+	return Call_BytesArr_Bytes(p.memory, p.allocator, p.caller, args...)
 }
 
 type ProxyStateDB struct {
 	Proxy
 }
 
-func NewProxyStateDB(memory mem.Memory, stateDBBridge WasmBridgeFunc) *ProxyStateDB {
-	return &ProxyStateDB{Proxy{memory: memory, bridgeFunc: stateDBBridge}}
+func NewProxyStateDB(memory bridge.Memory, allocator bridge.Allocator, stateDBCaller HostFuncCaller) *ProxyStateDB {
+	return &ProxyStateDB{Proxy{memory: memory, allocator: allocator, caller: stateDBCaller}}
 }
 
 func (p *ProxyStateDB) SetPersistentState(addr common.Address, key, value common.Hash) {
-	p.call(bridge.Op_StateDB_SetPersistentState.Encode(),
+	p.call(
+		bridge.Op_StateDB_SetPersistentState.Encode(),
 		addr.Bytes(),
 		key.Bytes(),
 		value.Bytes(),
@@ -134,10 +142,10 @@ type ProxyEVM struct {
 	db *ProxyStateDB
 }
 
-func NewProxyEVM(memory mem.Memory, evmBridge WasmBridgeFunc, stateDBBridge WasmBridgeFunc) *ProxyEVM {
+func NewProxyEVM(memory bridge.Memory, allocator bridge.Allocator, evmCaller HostFuncCaller, stateDBCaller HostFuncCaller) *ProxyEVM {
 	return &ProxyEVM{
-		Proxy: Proxy{memory: memory, bridgeFunc: evmBridge},
-		db:    NewProxyStateDB(memory, stateDBBridge),
+		Proxy: Proxy{memory: memory, allocator: allocator, caller: evmCaller},
+		db:    NewProxyStateDB(memory, allocator, stateDBCaller),
 	}
 }
 

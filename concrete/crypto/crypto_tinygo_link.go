@@ -18,22 +18,21 @@
 package crypto
 
 import (
-	"unsafe"
-
 	"github.com/ethereum/go-ethereum/common"
-	mem "github.com/ethereum/go-ethereum/tinygo/mem"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
+	tinygo_infra "github.com/ethereum/go-ethereum/tinygo/mem"
 )
 
 //go:wasm-module env
-//export concrete_Keccak256Bridge
-func _Keccak256Bridge(pointer uint64) uint64
+//export concrete_Keccak256Caller
+func _Keccak256Caller(pointer uint64) uint64
 
 func Keccak256(data ...[]byte) []byte {
-	dataPtr := mem.PutValues(data)
-	hashPtr := _Keccak256Bridge(dataPtr)
-	hash := mem.GetValue(hashPtr)
-	mem.Free(unsafe.Pointer(&hash[0]))
-	return hash
+	argsPointer := bridge.PutArgs(tinygo_infra.Memory, data)
+	retPointer := bridge.MemPointer(_Keccak256Caller(argsPointer.Uint64()))
+	retValue := bridge.GetValue(tinygo_infra.Memory, retPointer)
+	tinygo_infra.Allocator.Free(retPointer)
+	return retValue
 }
 
 func Keccak256Hash(data ...[]byte) (h common.Hash) {

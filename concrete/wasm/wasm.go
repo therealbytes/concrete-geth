@@ -17,6 +17,7 @@ package wasm
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -29,72 +30,56 @@ import (
 )
 
 var (
-	WASM_IS_PURE          = "concrete_IsPure"
-	WASM_MUTATES_STORAGE  = "concrete_MutatesStorage"
-	WASM_REQUIRED_GAS     = "concrete_RequiredGas"
-	WASM_FINALISE         = "concrete_Finalise"
-	WASM_COMMIT           = "concrete_Commit"
-	WASM_RUN              = "concrete_Run"
-	WASM_EVM_BRIDGE       = "concrete_EvmBridge"
-	WASM_STATEDB_BRIDGE   = "concrete_StateDBBridge"
-	WASM_ADDRESS_BRIDGE   = "concrete_AddressBridge"
-	WASM_LOG_BRIDGE       = "concrete_LogBridge"
-	WASM_KECCAK256_BRIDGE = "concrete_Keccak256Bridge"
+	// WASM functions
+	WASM_IS_PURE         = "concrete_IsPure"
+	WASM_MUTATES_STORAGE = "concrete_MutatesStorage"
+	WASM_REQUIRED_GAS    = "concrete_RequiredGas"
+	WASM_FINALISE        = "concrete_Finalise"
+	WASM_COMMIT          = "concrete_Commit"
+	WASM_RUN             = "concrete_Run"
+	// Host functions
+	WASM_EVM_CALLER       = "concrete_EvmCaller"
+	WASM_STATEDB_CALLER   = "concrete_StateDBCaller"
+	WASM_ADDRESS_CALLER   = "concrete_AddressCaller"
+	WASM_LOG_CALLER       = "concrete_LogCaller"
+	WASM_KECCAK256_CALLER = "concrete_Keccak256Caller"
 )
 
 func NewWasmPrecompile(code []byte, address common.Address) cc_api.Precompile {
-	pc := newStatelessWasmPrecompile(code, address)
+	pc := newWasmPrecompile(code, address)
 	if pc.isPure() {
-		return pc
+		return &statelessWasmPrecompile{pc}
 	}
-	pc.close()
-	return newStatefulWasmPrecompile(code)
+	return pc
 }
 
-type bridgeConfig struct {
-	evmBridge       native.NativeBridgeFunc
-	stateDBBridge   native.NativeBridgeFunc
-	addressBridge   native.NativeBridgeFunc
-	logBridge       native.NativeBridgeFunc
-	keccak256Bridge native.NativeBridgeFunc
+type hostConfig struct {
+	evm       native.HostFunc
+	statedb   native.HostFunc
+	address   native.HostFunc
+	log       native.HostFunc
+	keccak256 native.HostFunc
 }
 
-func newModule(bridges *bridgeConfig, code []byte) (wz_api.Module, wazero.Runtime, error) {
+func newHostConfig() *hostConfig {
+	return &hostConfig{
+		evm:       native.DisabledHostFunc,
+		statedb:   native.DisabledHostFunc,
+		address:   native.DisabledHostFunc,
+		log:       native.LogHostFunc,
+		keccak256: native.Keccak256HostFunc,
+	}
+}
 
+func newModule(config *hostConfig, code []byte) (wz_api.Module, wazero.Runtime, error) {
 	ctx := context.Background()
-
-	evmBridge := bridges.evmBridge
-	if evmBridge == nil {
-		evmBridge = native.DisabledBridge
-	}
-
-	stateDBBridge := bridges.stateDBBridge
-	if stateDBBridge == nil {
-		stateDBBridge = native.DisabledBridge
-	}
-
-	addressBridge := bridges.addressBridge
-	if addressBridge == nil {
-		addressBridge = native.BridgeAddress0
-	}
-
-	logBridge := bridges.logBridge
-	if logBridge == nil {
-		logBridge = native.BridgeLog
-	}
-
-	keccak256Bridge := bridges.keccak256Bridge
-	if keccak256Bridge == nil {
-		keccak256Bridge = native.BridgeKeccak256
-	}
-
 	r := wazero.NewRuntime(ctx)
 	_, err := r.NewHostModuleBuilder("env").
-		NewFunctionBuilder().WithFunc(evmBridge).Export(WASM_EVM_BRIDGE).
-		NewFunctionBuilder().WithFunc(stateDBBridge).Export(WASM_STATEDB_BRIDGE).
-		NewFunctionBuilder().WithFunc(addressBridge).Export(WASM_ADDRESS_BRIDGE).
-		NewFunctionBuilder().WithFunc(logBridge).Export(WASM_LOG_BRIDGE).
-		NewFunctionBuilder().WithFunc(keccak256Bridge).Export(WASM_KECCAK256_BRIDGE).
+		NewFunctionBuilder().WithFunc(config.evm).Export(WASM_EVM_CALLER).
+		NewFunctionBuilder().WithFunc(config.statedb).Export(WASM_STATEDB_CALLER).
+		NewFunctionBuilder().WithFunc(config.address).Export(WASM_ADDRESS_CALLER).
+		NewFunctionBuilder().WithFunc(config.log).Export(WASM_LOG_CALLER).
+		NewFunctionBuilder().WithFunc(config.keccak256).Export(WASM_KECCAK256_CALLER).
 		Instantiate(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -104,14 +89,50 @@ func newModule(bridges *bridgeConfig, code []byte) (wz_api.Module, wazero.Runtim
 	if err != nil {
 		return nil, nil, err
 	}
-
 	return mod, r, nil
 }
 
 type wasmPrecompile struct {
-	r     wazero.Runtime
-	mod   wz_api.Module
-	mutex sync.Mutex
+	r                 wazero.Runtime
+	mod               wz_api.Module
+	mutex             sync.Mutex
+	memory            bridge.Memory
+	allocator         bridge.Allocator
+	api               cc_api.API
+	expIsPure         wz_api.Function
+	expMutatesStorage wz_api.Function
+	expRequiredGas    wz_api.Function
+	expFinalise       wz_api.Function
+	expCommit         wz_api.Function
+	expRun            wz_api.Function
+}
+
+func newWasmPrecompile(code []byte, address common.Address) *wasmPrecompile {
+	pc := &wasmPrecompile{}
+
+	hostConfig := newHostConfig()
+	apiGetter := func() cc_api.API { return pc.api }
+	hostConfig.evm = native.NewEVMHostFunc(apiGetter)
+	hostConfig.statedb = native.NewStateDBHostFunc(apiGetter)
+	hostConfig.address = native.NewAddressHostFunc(address)
+
+	mod, r, err := newModule(hostConfig, code)
+	if err != nil {
+		panic(err)
+	}
+
+	pc.r = r
+	pc.mod = mod
+	pc.memory, pc.allocator = native.NewMemory(context.Background(), mod)
+
+	pc.expIsPure = mod.ExportedFunction(WASM_IS_PURE)
+	pc.expMutatesStorage = mod.ExportedFunction(WASM_MUTATES_STORAGE)
+	pc.expRequiredGas = mod.ExportedFunction(WASM_REQUIRED_GAS)
+	pc.expFinalise = mod.ExportedFunction(WASM_FINALISE)
+	pc.expCommit = mod.ExportedFunction(WASM_COMMIT)
+	pc.expRun = mod.ExportedFunction(WASM_RUN)
+
+	return pc
 }
 
 func (p *wasmPrecompile) close() {
@@ -119,175 +140,102 @@ func (p *wasmPrecompile) close() {
 	p.r.Close(ctx)
 }
 
-func (p *wasmPrecompile) call__Uint64(funcName *string) uint64 {
+func (p *wasmPrecompile) call__Uint64(expFunc wz_api.Function) uint64 {
 	ctx := context.Background()
-	_ret, err := p.mod.ExportedFunction(*funcName).Call(ctx)
+	_ret, err := expFunc.Call(ctx)
 	if err != nil {
 		panic(err)
 	}
 	return _ret[0]
 }
 
-func (p *wasmPrecompile) call_Bytes_Uint64(funcName *string, input []byte) uint64 {
-	ctx := context.Background()
-	pointer, err := native.WriteMemory(ctx, p.mod, input)
-	if err != nil {
-		panic(err)
-	}
-	defer native.FreeMemory(ctx, p.mod, pointer)
-	_ret, err := p.mod.ExportedFunction(*funcName).Call(ctx, pointer.Uint64())
-	if err != nil {
-		panic(err)
-	}
-	return _ret[0]
-}
-
-func (p *wasmPrecompile) call_Bytes_BytesErr(funcName *string, input []byte) ([]byte, error) {
-	ctx := context.Background()
-	_retPointer := p.call_Bytes_Uint64(funcName, input)
+func (p *wasmPrecompile) call__Err(expFunc wz_api.Function) error {
+	_retPointer := p.call__Uint64(expFunc)
 	retPointer := bridge.MemPointer(_retPointer)
-	retValues, retErr := native.GetReturnWithError(ctx, p.mod, retPointer)
-	return retValues[0], retErr
+	_, retErr := bridge.GetReturnWithError(p.memory, retPointer)
+	return retErr
 }
 
-func (p *wasmPrecompile) call__Err(funcName *string) error {
+func (p *wasmPrecompile) call_Bytes_Uint64(expFunc wz_api.Function, input []byte) uint64 {
 	ctx := context.Background()
-	_retPointer, err := p.mod.ExportedFunction(*funcName).Call(ctx)
+	pointer := bridge.PutValue(p.memory, input)
+	defer p.allocator.Free(pointer)
+	_ret, err := expFunc.Call(ctx, pointer.Uint64())
 	if err != nil {
+		fmt.Println("err", err)
 		panic(err)
 	}
-	retPointer := bridge.MemPointer(_retPointer[0])
-	_, retErr := native.GetReturnWithError(ctx, p.mod, retPointer)
-	return retErr
+	return _ret[0]
+}
+
+func (p *wasmPrecompile) call_Bytes_BytesErr(expFunc wz_api.Function, input []byte) ([]byte, error) {
+	_retPointer := p.call_Bytes_Uint64(expFunc, input)
+	retPointer := bridge.MemPointer(_retPointer)
+	retValues, retErr := bridge.GetReturnWithError(p.memory, retPointer)
+	return retValues[0], retErr
 }
 
 func (p *wasmPrecompile) before(api cc_api.API) {
 	p.mutex.Lock()
+	p.api = api
 }
 
 func (p *wasmPrecompile) after(api cc_api.API) {
-	ctx := context.Background()
-	err := native.PruneMemory(ctx, p.mod)
-	if err != nil {
-		panic(err)
-	}
+	p.api = nil
+	p.allocator.Prune()
 	p.mutex.Unlock()
-}
-
-type statelessWasmPrecompile struct {
-	wasmPrecompile
-}
-
-func newStatelessWasmPrecompile(code []byte, address common.Address) *statelessWasmPrecompile {
-	addressBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
-		return native.BridgeAddress(ctx, mod, pointer, address)
-	}
-	mod, r, err := newModule(&bridgeConfig{addressBridge: addressBridge}, code)
-	if err != nil {
-		panic(err)
-	}
-	return &statelessWasmPrecompile{wasmPrecompile{r: r, mod: mod}}
 }
 
 func (p *wasmPrecompile) isPure() bool {
 	p.before(nil)
 	defer p.after(nil)
-	return p.call__Uint64(&WASM_IS_PURE) != 0
-}
-
-func (p *wasmPrecompile) MutatesStorage(input []byte) bool {
-	return false
+	return p.call__Uint64(p.expIsPure) != 0
 }
 
 func (p *wasmPrecompile) RequiredGas(input []byte) uint64 {
 	p.before(nil)
 	defer p.after(nil)
-	return p.call_Bytes_Uint64(&WASM_REQUIRED_GAS, input)
+	return p.call_Bytes_Uint64(p.expRequiredGas, input)
+}
+
+func (p *wasmPrecompile) MutatesStorage(input []byte) bool {
+	p.before(nil)
+	defer p.after(nil)
+	return p.call_Bytes_Uint64(p.expMutatesStorage, input) != 0
 }
 
 func (p *wasmPrecompile) Finalise(api cc_api.API) error {
-	return nil
+	p.before(api)
+	defer p.after(api)
+	return p.call__Err(p.expFinalise)
 }
 
 func (p *wasmPrecompile) Commit(api cc_api.API) error {
-	return nil
+	p.before(api)
+	defer p.after(api)
+	return p.call__Err(p.expCommit)
 }
 
 func (p *wasmPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
 	p.before(api)
 	defer p.after(api)
-	return p.call_Bytes_BytesErr(&WASM_RUN, input)
+	return p.call_Bytes_BytesErr(p.expRun, input)
 }
 
-var _ cc_api.Precompile = (*statelessWasmPrecompile)(nil)
+var _ cc_api.Precompile = (*wasmPrecompile)(nil)
 
-type statefulWasmPrecompile struct {
-	wasmPrecompile
-	api cc_api.API
+type statelessWasmPrecompile struct {
+	*wasmPrecompile
 }
 
-func newStatefulWasmPrecompile(code []byte) *statefulWasmPrecompile {
-	pc := &statefulWasmPrecompile{}
-
-	evmBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
-		return native.BridgeCallEVM(ctx, mod, pointer, pc.api.EVM())
-	}
-	stateDBBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
-		return native.BridgeCallStateDB(ctx, mod, pointer, pc.api.StateDB())
-	}
-	addressBridge := func(ctx context.Context, mod wz_api.Module, pointer uint64) uint64 {
-		return native.BridgeAddress(ctx, mod, pointer, pc.api.Address())
-	}
-
-	bridges := &bridgeConfig{
-		evmBridge:     evmBridge,
-		stateDBBridge: stateDBBridge,
-		addressBridge: addressBridge,
-	}
-
-	mod, r, err := newModule(bridges, code)
-	if err != nil {
-		panic(err)
-	}
-
-	pc.r = r
-	pc.mod = mod
-
-	return pc
+func (p *statelessWasmPrecompile) MutatesStorage(input []byte) bool {
+	return false
 }
 
-func (p *statefulWasmPrecompile) before(api cc_api.API) {
-	p.wasmPrecompile.before(api)
-	p.api = api
+func (p *statelessWasmPrecompile) Finalise(api cc_api.API) error {
+	return nil
 }
 
-func (p *statefulWasmPrecompile) after(api cc_api.API) {
-	p.api = nil
-	p.wasmPrecompile.after(api)
+func (p *statelessWasmPrecompile) Commit(api cc_api.API) error {
+	return nil
 }
-
-func (p *statefulWasmPrecompile) MutatesStorage(input []byte) bool {
-	p.before(nil)
-	defer p.after(nil)
-	return p.call_Bytes_Uint64(&WASM_MUTATES_STORAGE, input) != 0
-}
-
-func (p *statefulWasmPrecompile) Finalise(api cc_api.API) error {
-	p.before(api)
-	defer p.after(api)
-	return p.call__Err(&WASM_FINALISE)
-}
-
-func (p *statefulWasmPrecompile) Commit(api cc_api.API) error {
-	p.before(api)
-	defer p.after(api)
-	return p.call__Err(&WASM_COMMIT)
-}
-
-func (p *statefulWasmPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
-	p.before(api)
-	defer p.after(api)
-	return p.call_Bytes_BytesErr(&WASM_RUN, input)
-}
-
-var _ cc_api.Precompile = (*statefulWasmPrecompile)(nil)
