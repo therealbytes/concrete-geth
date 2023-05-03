@@ -128,15 +128,30 @@ func (m *memory) Read(pointer bridge.MemPointer) []byte {
 type HostFunc func(ctx context.Context, module wz_api.Module, pointer uint64) uint64
 
 func NewStateDBHostFunc(apiGetter func() cc_api.API) HostFunc {
-	return func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+	return func(ctx context.Context, module wz_api.Module, _pointer uint64) uint64 {
+		statedb := apiGetter().StateDB()
 		mem, _ := NewMemory(ctx, module)
-		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
-		var opcode bridge.OpCode
-		opcode.Decode(args[0])
-		args = args[1:]
-		out := CallStateDB(apiGetter().StateDB(), opcode, args)
-		ptr := bridge.PutValue(mem, out).Uint64()
-		return ptr
+
+		var handleCall func(pointer bridge.MemPointer) bridge.MemPointer
+		handleCall = func(pointer bridge.MemPointer) bridge.MemPointer {
+			args := bridge.GetArgs(mem, pointer)
+			var opcode bridge.OpCode
+			opcode.Decode(args[0])
+			args = args[1:]
+
+			if opcode == bridge.Op_StateDB_Many {
+				for _, ptr := range bridge.UnpackPointers(args[0]) {
+					handleCall(ptr)
+				}
+				return bridge.NullPointer
+			} else {
+				out := CallStateDB(statedb, opcode, args)
+				ptr := bridge.PutValue(mem, out)
+				return ptr
+			}
+		}
+
+		return handleCall(bridge.MemPointer(_pointer)).Uint64()
 	}
 }
 

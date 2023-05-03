@@ -53,13 +53,20 @@ const (
 )
 
 const (
+	Op_StateDB_Many OpCode = iota + 32
+)
+
+const (
 	Op_EVM_BlockHash OpCode = iota
 	Op_EVM_BlockTimestamp
 	Op_EVM_BlockNumber
 	Op_EVM_BlockDifficulty
 	Op_EVM_BlockGasLimit
 	Op_EVM_BlockCoinbase
-	Op_EVM_Block
+)
+
+const (
+	Op_EVM_Block OpCode = iota + 32
 )
 
 func (opcode OpCode) Encode() []byte {

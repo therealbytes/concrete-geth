@@ -72,7 +72,8 @@ func (p *ProxyStateDB) GetPersistentState(addr common.Address, key common.Hash) 
 }
 
 func (p *ProxyStateDB) SetEphemeralState(addr common.Address, key common.Hash, value common.Hash) {
-	p.call(bridge.Op_StateDB_SetEphemeralState.Encode(),
+	p.call(
+		bridge.Op_StateDB_SetEphemeralState.Encode(),
 		addr.Bytes(),
 		key.Bytes(),
 		value.Bytes(),
@@ -252,21 +253,44 @@ func (p *CachedProxyStateDB) GetEphemeralPreimageSize(hash common.Hash) int {
 }
 
 func (p *CachedProxyStateDB) Commit() {
+	pointers := make([]bridge.MemPointer, 0)
 	for addr, dirties := range p.persistentStateDirty {
 		for key := range dirties {
-			p.ProxyStateDB.SetPersistentState(addr, key, p.persistentState[addr][key])
+			pointer := bridge.PutArgs(p.memory, [][]byte{
+				bridge.Op_StateDB_SetPersistentState.Encode(),
+				addr.Bytes(),
+				key.Bytes(),
+				p.persistentState[addr][key].Bytes(),
+			})
+			pointers = append(pointers, pointer)
 		}
 	}
 	for addr, dirties := range p.ephemeralStateDirty {
 		for key := range dirties {
-			p.ProxyStateDB.SetEphemeralState(addr, key, p.ephemeralState[addr][key])
+			pointer := bridge.PutArgs(p.memory, [][]byte{
+				bridge.Op_StateDB_SetEphemeralState.Encode(),
+				addr.Bytes(),
+				key.Bytes(),
+				p.ephemeralState[addr][key].Bytes(),
+			})
+			pointers = append(pointers, pointer)
 		}
 	}
 	for hash := range p.persistentPreimagesDirty {
-		p.ProxyStateDB.AddPersistentPreimage(hash, p.persistentPreimages[hash])
+		pointer := bridge.PutArgs(p.memory, [][]byte{
+			bridge.Op_StateDB_AddPersistentPreimage.Encode(),
+			hash.Bytes(),
+			p.persistentPreimages[hash],
+		})
+		pointers = append(pointers, pointer)
 	}
 	for hash := range p.ephemeralPreimagesDirty {
-		p.ProxyStateDB.AddEphemeralPreimage(hash, p.ephemeralPreimages[hash])
+		pointer := bridge.PutArgs(p.memory, [][]byte{
+			bridge.Op_StateDB_AddEphemeralPreimage.Encode(),
+			hash.Bytes(),
+			p.ephemeralPreimages[hash],
+		})
+		pointers = append(pointers, pointer)
 	}
 	if len(p.persistentStateDirty) > 0 {
 		p.persistentStateDirty = make(map[common.Address]map[common.Hash]struct{})
@@ -280,6 +304,7 @@ func (p *CachedProxyStateDB) Commit() {
 	if len(p.ephemeralPreimagesDirty) > 0 {
 		p.ephemeralPreimagesDirty = make(map[common.Hash]struct{})
 	}
+	p.call(bridge.Op_StateDB_Many.Encode(), bridge.PackPointers(pointers))
 }
 
 type ProxyEVM struct {
