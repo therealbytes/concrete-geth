@@ -43,6 +43,7 @@ var (
 	WASM_ADDRESS_CALLER   = "concrete_AddressCaller"
 	WASM_LOG_CALLER       = "concrete_LogCaller"
 	WASM_KECCAK256_CALLER = "concrete_Keccak256Caller"
+	WASM_TIME_CALLER      = "concrete_TimeCaller"
 )
 
 func NewWasmPrecompile(code []byte, address common.Address) cc_api.Precompile {
@@ -59,6 +60,7 @@ type hostConfig struct {
 	address   host.HostFunc
 	log       host.HostFunc
 	keccak256 host.HostFunc
+	time      host.HostFunc
 }
 
 func newHostConfig() *hostConfig {
@@ -68,6 +70,7 @@ func newHostConfig() *hostConfig {
 		address:   host.DisabledHostFunc,
 		log:       host.LogHostFunc,
 		keccak256: host.Keccak256HostFunc,
+		time:      host.TimeHostFunc,
 	}
 }
 
@@ -80,6 +83,7 @@ func newModule(config *hostConfig, code []byte) (wz_api.Module, wazero.Runtime, 
 		NewFunctionBuilder().WithFunc(config.address).Export(WASM_ADDRESS_CALLER).
 		NewFunctionBuilder().WithFunc(config.log).Export(WASM_LOG_CALLER).
 		NewFunctionBuilder().WithFunc(config.keccak256).Export(WASM_KECCAK256_CALLER).
+		NewFunctionBuilder().WithFunc(config.time).Export(WASM_TIME_CALLER).
 		Instantiate(ctx)
 	if err != nil {
 		return nil, nil, err

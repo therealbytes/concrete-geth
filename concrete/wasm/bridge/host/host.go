@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
@@ -190,6 +191,10 @@ func Keccak256HostFunc(ctx context.Context, module wz_api.Module, pointer uint64
 	data := bridge.GetValues(mem, bridge.MemPointer(pointer))
 	hash := crypto.Keccak256(data...)
 	return bridge.PutValue(mem, hash).Uint64()
+}
+
+func TimeHostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+	return uint64(time.Now().UnixNano())
 }
 
 func CallStateDB(db cc_api.StateDB, opcode bridge.OpCode, args [][]byte) []byte {

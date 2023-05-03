@@ -19,6 +19,7 @@ package std
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/concrete/crypto"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
@@ -33,6 +34,14 @@ func Log(a ...any) {
 	msg := []byte(fmt.Sprintln(a...))
 	data := [][]byte{msg[:len(msg)-1]}
 	wasm.Call_BytesArr_Bytes(mem.Memory, mem.Allocator, func(pointer uint64) uint64 { return _logCaller(pointer) }, data...)
+}
+
+//go:wasm-module env
+//export concrete_TimeCaller
+func _timeCaller(pointer uint64) uint64
+
+func Now() time.Time {
+	return time.Unix(0, int64(_timeCaller(0)))
 }
 
 var Keccak256 = crypto.ReimplementedKeccak256
