@@ -32,7 +32,9 @@ func (pc *log) Run(api cc_api.API, input []byte) ([]byte, error) {
 }
 
 func init() {
-	tinygo.WasmWrap(&log{}, true)
+	config := tinygo.DefaultConfig
+	config.IsPure = true
+	tinygo.WasmWrapWithConfig(&log{}, config)
 }
 
 // main is REQUIRED for TinyGo to compile to Wasm

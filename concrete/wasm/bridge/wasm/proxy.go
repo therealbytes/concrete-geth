@@ -309,13 +309,18 @@ func (p *CachedProxyStateDB) Commit() {
 
 type ProxyEVM struct {
 	Proxy
-	db *ProxyStateDB
+	db api.StateDB
 }
 
 func NewProxyEVM(memory bridge.Memory, allocator bridge.Allocator, evmCaller HostFuncCaller, stateDBCaller HostFuncCaller) *ProxyEVM {
+	statedb := NewProxyStateDB(memory, allocator, stateDBCaller)
+	return NewProxyEVMWithStateDB(memory, allocator, evmCaller, statedb)
+}
+
+func NewProxyEVMWithStateDB(memory bridge.Memory, allocator bridge.Allocator, evmCaller HostFuncCaller, statedb api.StateDB) *ProxyEVM {
 	return &ProxyEVM{
 		Proxy: Proxy{memory: memory, allocator: allocator, caller: evmCaller},
-		db:    NewProxyStateDB(memory, allocator, stateDBCaller),
+		db:    statedb,
 	}
 }
 

@@ -23,17 +23,32 @@ import (
 	"github.com/ethereum/go-ethereum/tinygo/mem"
 )
 
-// Note: This uses a uint64 instead of two result values for compatibility with
-// WebAssembly 1.0.
-
 var precompile cc_api.Precompile
-var precompileIsPure bool
+var precompileConfig WasmConfig
 var precompileAddress common.Address
 
-func WasmWrap(pc cc_api.Precompile, isPure bool) {
-	precompile = pc
-	precompileIsPure = isPure
+type WasmConfig struct {
+	IsPure       bool
+	CacheProxies bool
 }
+
+var DefaultConfig = WasmConfig{
+	IsPure:       false,
+	CacheProxies: false,
+}
+
+func WasmWrap(pc cc_api.Precompile) {
+	precompile = pc
+	precompileConfig = DefaultConfig
+}
+
+func WasmWrapWithConfig(pc cc_api.Precompile, config WasmConfig) {
+	precompile = pc
+	precompileConfig = config
+}
+
+// Note: This uses a uint64 instead of two result values for compatibility with
+// WebAssembly 1.0.
 
 //go:wasm-module env
 //export concrete_EvmCaller
@@ -68,13 +83,24 @@ func getAddress() common.Address {
 }
 
 func newAPI() cc_api.API {
-	evm := wasm.NewCachedProxyEVM(mem.Memory, mem.Allocator, evmCaller, stateDBCaller)
+	var statedb cc_api.StateDB
+	if precompileConfig.CacheProxies && !precompileConfig.IsPure {
+		statedb = wasm.NewCachedProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
+	} else {
+		statedb = wasm.NewProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
+	}
+	evm := wasm.NewProxyEVMWithStateDB(mem.Memory, mem.Allocator, evmCaller, statedb)
 	address := getAddress()
 	return cc_api.New(evm, address)
 }
 
 func newCommitSafeStateAPI() cc_api.API {
-	statedb := wasm.NewCachedProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
+	var statedb cc_api.StateDB
+	if precompileConfig.CacheProxies && !precompileConfig.IsPure {
+		statedb = wasm.NewCachedProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
+	} else {
+		statedb = wasm.NewProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
+	}
 	address := getAddress()
 	return cc_api.NewStateAPI(cc_api.NewCommitSafeStateDB(statedb), address)
 }
@@ -88,7 +114,7 @@ func commitProxyCache(api cc_api.API) {
 
 //export concrete_IsPure
 func isPure() uint64 {
-	if precompileIsPure {
+	if precompileConfig.IsPure {
 		return 1
 	} else {
 		return 0
@@ -115,7 +141,9 @@ func requiredGas(pointer uint64) uint64 {
 //export concrete_Finalise
 func finalise() uint64 {
 	api := newCommitSafeStateAPI()
-	defer commitProxyCache(api)
+	if precompileConfig.CacheProxies {
+		defer commitProxyCache(api)
+	}
 	precompile.Finalise(api)
 	return bridge.NullPointer.Uint64()
 }
@@ -123,7 +151,9 @@ func finalise() uint64 {
 //export concrete_Commit
 func commit() uint64 {
 	api := newCommitSafeStateAPI()
-	defer commitProxyCache(api)
+	if precompileConfig.CacheProxies {
+		defer commitProxyCache(api)
+	}
 	precompile.Commit(api)
 	return bridge.NullPointer.Uint64()
 }
@@ -132,7 +162,9 @@ func commit() uint64 {
 func run(pointer uint64) uint64 {
 	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
 	api := newAPI()
-	defer commitProxyCache(api)
+	if precompileConfig.CacheProxies {
+		defer commitProxyCache(api)
+	}
 	output, err := precompile.Run(api, input)
 	return bridge.PutReturnWithError(mem.Memory, [][]byte{output}, err).Uint64()
 }
