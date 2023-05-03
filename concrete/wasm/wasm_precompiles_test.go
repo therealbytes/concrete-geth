@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/lib"
-	"github.com/ethereum/go-ethereum/concrete/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -45,8 +44,8 @@ var typicalCode []byte
 
 func TestWasmLog(t *testing.T) {
 	address := common.HexToAddress("0x01")
-	statedb := test.NewTestStateDB()
-	evm := test.NewTestEVM(statedb)
+	statedb := NewTestStateDB()
+	evm := NewTestEVM(statedb)
 	api := cc_api.New(evm, address)
 	hostConfig := newHostConfig()
 
@@ -139,8 +138,8 @@ func TestStatefulPrecompile(t *testing.T) {
 	for ii := 0; ii < routines; ii++ {
 		go func(ii int) {
 			defer wg.Done()
-			statedb := test.NewTestStateDB()
-			evm := test.NewTestEVM(statedb)
+			statedb := NewTestStateDB()
+			evm := NewTestEVM(statedb)
 			api := cc_api.New(evm, address)
 			counter := lib.NewCounter(api.Persistent().NewReference(runCounterKey))
 			require.Equal(t, uint64(0), counter.Get().Uint64())
@@ -158,8 +157,8 @@ func TestStatefulPrecompile(t *testing.T) {
 }
 
 func newBenchmarkAPI(address common.Address) cc_api.API {
-	statedb := test.NewTestStateDB()
-	evm := test.NewTestEVM(statedb)
+	statedb := NewTestStateDB()
+	evm := NewTestEVM(statedb)
 	api := cc_api.New(evm, address)
 	return api
 }
