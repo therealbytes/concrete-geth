@@ -27,7 +27,7 @@ import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/host"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	wz_api "github.com/tetratelabs/wazero/api"
@@ -51,12 +51,12 @@ func TestWasmLog(t *testing.T) {
 
 	var lastLog string
 	hostConfig.log = func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-		mem, _ := native.NewMemory(ctx, module)
+		mem, _ := host.NewMemory(ctx, module)
 		_msg := bridge.GetValues(mem, bridge.MemPointer(pointer))
 		lastLog = string(_msg[0])
 		return bridge.NullPointer.Uint64()
 	}
-	hostConfig.address = native.NewAddressHostFunc(address)
+	hostConfig.address = host.NewAddressHostFunc(address)
 
 	ctx := context.Background()
 	mod, r, err := newModule(hostConfig, logCode)
@@ -65,7 +65,7 @@ func TestWasmLog(t *testing.T) {
 	pc := &wasmPrecompile{}
 	pc.r = r
 	pc.mod = mod
-	pc.memory, pc.allocator = native.NewMemory(ctx, mod)
+	pc.memory, pc.allocator = host.NewMemory(ctx, mod)
 	pc.expRun = mod.ExportedFunction(WASM_RUN)
 	defer pc.close()
 

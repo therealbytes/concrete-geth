@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/host"
 	"github.com/stretchr/testify/require"
 )
 
@@ -184,7 +184,7 @@ func newTestMemory() (bridge.Memory, bridge.Allocator) {
 		panic(err)
 	}
 	ctx := context.Background()
-	return native.NewMemory(ctx, mod)
+	return host.NewMemory(ctx, mod)
 }
 
 func TestWasmMemoryReadWrite(t *testing.T) {

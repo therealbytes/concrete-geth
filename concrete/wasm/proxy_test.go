@@ -23,7 +23,7 @@ import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	cc_api_test "github.com/ethereum/go-ethereum/concrete/api/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/host"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +34,7 @@ func NewStateDBHostFunc(mem bridge.Memory, db cc_api.StateDB) wasm.HostFuncCalle
 		var opcode bridge.OpCode
 		opcode.Decode(args[0])
 		args = args[1:]
-		out := native.CallStateDB(db, opcode, args)
+		out := host.CallStateDB(db, opcode, args)
 		return bridge.PutValue(mem, out).Uint64()
 	}
 }
@@ -138,7 +138,7 @@ func NewEVMHostFunc(mem bridge.Memory, evm cc_api.EVM) wasm.HostFuncCaller {
 		var opcode bridge.OpCode
 		opcode.Decode(args[0])
 		args = args[1:]
-		out := native.CallEVM(evm, opcode, args)
+		out := host.CallEVM(evm, opcode, args)
 		return bridge.PutValue(mem, out).Uint64()
 	}
 }

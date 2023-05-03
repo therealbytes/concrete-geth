@@ -23,7 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/native"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/host"
 	"github.com/tetratelabs/wazero"
 	wz_api "github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -54,20 +54,20 @@ func NewWasmPrecompile(code []byte, address common.Address) cc_api.Precompile {
 }
 
 type hostConfig struct {
-	evm       native.HostFunc
-	statedb   native.HostFunc
-	address   native.HostFunc
-	log       native.HostFunc
-	keccak256 native.HostFunc
+	evm       host.HostFunc
+	statedb   host.HostFunc
+	address   host.HostFunc
+	log       host.HostFunc
+	keccak256 host.HostFunc
 }
 
 func newHostConfig() *hostConfig {
 	return &hostConfig{
-		evm:       native.DisabledHostFunc,
-		statedb:   native.DisabledHostFunc,
-		address:   native.DisabledHostFunc,
-		log:       native.LogHostFunc,
-		keccak256: native.Keccak256HostFunc,
+		evm:       host.DisabledHostFunc,
+		statedb:   host.DisabledHostFunc,
+		address:   host.DisabledHostFunc,
+		log:       host.LogHostFunc,
+		keccak256: host.Keccak256HostFunc,
 	}
 }
 
@@ -112,9 +112,9 @@ func newWasmPrecompile(code []byte, address common.Address) *wasmPrecompile {
 
 	hostConfig := newHostConfig()
 	apiGetter := func() cc_api.API { return pc.api }
-	hostConfig.evm = native.NewEVMHostFunc(apiGetter)
-	hostConfig.statedb = native.NewStateDBHostFunc(apiGetter)
-	hostConfig.address = native.NewAddressHostFunc(address)
+	hostConfig.evm = host.NewEVMHostFunc(apiGetter)
+	hostConfig.statedb = host.NewStateDBHostFunc(apiGetter)
+	hostConfig.address = host.NewAddressHostFunc(address)
 
 	mod, r, err := newModule(hostConfig, code)
 	if err != nil {
@@ -123,7 +123,7 @@ func newWasmPrecompile(code []byte, address common.Address) *wasmPrecompile {
 
 	pc.r = r
 	pc.mod = mod
-	pc.memory, pc.allocator = native.NewMemory(context.Background(), mod)
+	pc.memory, pc.allocator = host.NewMemory(context.Background(), mod)
 
 	pc.expIsPure = mod.ExportedFunction(WASM_IS_PURE)
 	pc.expMutatesStorage = mod.ExportedFunction(WASM_MUTATES_STORAGE)
