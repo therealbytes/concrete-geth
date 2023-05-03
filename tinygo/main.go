@@ -32,6 +32,10 @@ type WasmConfig struct {
 	CacheProxies bool
 }
 
+func (c WasmConfig) cacheProxies() bool {
+	return c.CacheProxies && !c.IsPure
+}
+
 var DefaultConfig = WasmConfig{
 	IsPure:       false,
 	CacheProxies: false,
@@ -84,7 +88,7 @@ func getAddress() common.Address {
 
 func newAPI() cc_api.API {
 	var statedb cc_api.StateDB
-	if precompileConfig.CacheProxies && !precompileConfig.IsPure {
+	if precompileConfig.cacheProxies() {
 		statedb = wasm.NewCachedProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
 	} else {
 		statedb = wasm.NewProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
@@ -96,7 +100,7 @@ func newAPI() cc_api.API {
 
 func newCommitSafeStateAPI() cc_api.API {
 	var statedb cc_api.StateDB
-	if precompileConfig.CacheProxies && !precompileConfig.IsPure {
+	if precompileConfig.cacheProxies() {
 		statedb = wasm.NewCachedProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
 	} else {
 		statedb = wasm.NewProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
@@ -106,8 +110,11 @@ func newCommitSafeStateAPI() cc_api.API {
 }
 
 func commitProxyCache(api cc_api.API) {
-	evm := api.EVM()
-	if proxy, ok := evm.(*wasm.CachedProxyEVM); ok {
+	if !precompileConfig.cacheProxies() {
+		return
+	}
+	statedb := api.StateDB()
+	if proxy, ok := statedb.(*wasm.CachedProxyStateDB); ok {
 		proxy.Commit()
 	}
 }
@@ -141,9 +148,7 @@ func requiredGas(pointer uint64) uint64 {
 //export concrete_Finalise
 func finalise() uint64 {
 	api := newCommitSafeStateAPI()
-	if precompileConfig.CacheProxies {
-		defer commitProxyCache(api)
-	}
+	defer commitProxyCache(api)
 	precompile.Finalise(api)
 	return bridge.NullPointer.Uint64()
 }
@@ -151,9 +156,7 @@ func finalise() uint64 {
 //export concrete_Commit
 func commit() uint64 {
 	api := newCommitSafeStateAPI()
-	if precompileConfig.CacheProxies {
-		defer commitProxyCache(api)
-	}
+	defer commitProxyCache(api)
 	precompile.Commit(api)
 	return bridge.NullPointer.Uint64()
 }
@@ -162,9 +165,7 @@ func commit() uint64 {
 func run(pointer uint64) uint64 {
 	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
 	api := newAPI()
-	if precompileConfig.CacheProxies {
-		defer commitProxyCache(api)
-	}
+	defer commitProxyCache(api)
 	output, err := precompile.Run(api, input)
 	return bridge.PutReturnWithError(mem.Memory, [][]byte{output}, err).Uint64()
 }
