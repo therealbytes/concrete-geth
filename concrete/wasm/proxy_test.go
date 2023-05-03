@@ -164,3 +164,17 @@ func TestEVMProxy(t *testing.T) {
 	require.Equal(t, evm.BlockGasLimit(), proxy.BlockGasLimit())
 	require.Equal(t, evm.BlockCoinbase(), proxy.BlockCoinbase())
 }
+
+func TestBlockEncodeDecode(t *testing.T) {
+	block1 := bridge.BlockData{
+		Timestamp:  common.Big1,
+		Number:     common.Big2,
+		Difficulty: common.Big3,
+		GasLimit:   common.Big32,
+		Coinbase:   common.Address{1},
+	}
+	encoded := block1.Encode()
+	block2 := bridge.BlockData{}
+	block2.Decode(encoded)
+	require.Equal(t, block1, block2)
+}

@@ -68,15 +68,22 @@ func GetAddress() common.Address {
 }
 
 func NewAPI() cc_api.API {
-	evm := wasm.NewProxyEVM(mem.Memory, mem.Allocator, EvmCaller, StateDBCaller)
+	evm := wasm.NewCachedProxyEVM(mem.Memory, mem.Allocator, EvmCaller, StateDBCaller)
 	address := GetAddress()
 	return cc_api.New(evm, address)
 }
 
 func NewCommitSafeStateAPI() cc_api.API {
-	statedb := wasm.NewProxyStateDB(mem.Memory, mem.Allocator, StateDBCaller)
+	statedb := wasm.NewCachedProxyStateDB(mem.Memory, mem.Allocator, StateDBCaller)
 	address := GetAddress()
 	return cc_api.NewStateAPI(cc_api.NewCommitSafeStateDB(statedb), address)
+}
+
+func CommitProxyCache(api cc_api.API) {
+	evm := api.EVM()
+	if proxy, ok := evm.(*wasm.CachedProxyEVM); ok {
+		proxy.Commit()
+	}
 }
 
 //export concrete_IsPure
@@ -108,6 +115,7 @@ func RequiredGas(pointer uint64) uint64 {
 //export concrete_Finalise
 func Finalise() uint64 {
 	api := NewCommitSafeStateAPI()
+	defer CommitProxyCache(api)
 	precompile.Finalise(api)
 	return bridge.NullPointer.Uint64()
 }
@@ -115,6 +123,7 @@ func Finalise() uint64 {
 //export concrete_Commit
 func Commit() uint64 {
 	api := NewCommitSafeStateAPI()
+	defer CommitProxyCache(api)
 	precompile.Commit(api)
 	return bridge.NullPointer.Uint64()
 }
@@ -123,6 +132,7 @@ func Commit() uint64 {
 func Run(pointer uint64) uint64 {
 	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
 	api := NewAPI()
+	defer CommitProxyCache(api)
 	output, err := precompile.Run(api, input)
 	return bridge.PutReturnWithError(mem.Memory, [][]byte{output}, err).Uint64()
 }

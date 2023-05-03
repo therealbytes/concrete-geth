@@ -263,6 +263,16 @@ func CallEVM(evm cc_api.EVM, opcode bridge.OpCode, args [][]byte) []byte {
 	case bridge.Op_EVM_BlockCoinbase:
 		coinbase := evm.BlockCoinbase()
 		return coinbase.Bytes()
+
+	case bridge.Op_EVM_Block:
+		block := bridge.BlockData{
+			Timestamp:  evm.BlockTimestamp(),
+			Number:     evm.BlockNumber(),
+			Difficulty: evm.BlockDifficulty(),
+			GasLimit:   evm.BlockGasLimit(),
+			Coinbase:   evm.BlockCoinbase(),
+		}
+		return block.Encode()
 	}
 
 	return nil
