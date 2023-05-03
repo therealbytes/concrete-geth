@@ -25,11 +25,11 @@ import (
 
 //go:wasm-module env
 //export concrete_Keccak256Caller
-func _Keccak256Caller(pointer uint64) uint64
+func _keccak256Caller(pointer uint64) uint64
 
 func Keccak256(data ...[]byte) []byte {
 	argsPointer := bridge.PutArgs(tinygo_infra.Memory, data)
-	retPointer := bridge.MemPointer(_Keccak256Caller(argsPointer.Uint64()))
+	retPointer := bridge.MemPointer(_keccak256Caller(argsPointer.Uint64()))
 	retValue := bridge.GetValue(tinygo_infra.Memory, retPointer)
 	tinygo_infra.Allocator.Free(retPointer)
 	return retValue

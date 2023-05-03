@@ -27,12 +27,12 @@ import (
 
 //go:wasm-module env
 //export concrete_LogCaller
-func _LogCaller(pointer uint64) uint64
+func _logCaller(pointer uint64) uint64
 
 func Log(a ...any) {
 	msg := []byte(fmt.Sprintln(a...))
 	data := [][]byte{msg[:len(msg)-1]}
-	wasm.Call_BytesArr_Bytes(mem.Memory, mem.Allocator, func(pointer uint64) uint64 { return _LogCaller(pointer) }, data...)
+	wasm.Call_BytesArr_Bytes(mem.Memory, mem.Allocator, func(pointer uint64) uint64 { return _logCaller(pointer) }, data...)
 }
 
 var Keccak256 = crypto.ReimplementedKeccak256
