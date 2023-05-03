@@ -28,6 +28,10 @@ func Log(a ...any) {
 	fmt.Println(a...)
 }
 
+func Print(a ...any) {
+	fmt.Println(a...)
+}
+
 func Now() time.Time {
 	return time.Now()
 }

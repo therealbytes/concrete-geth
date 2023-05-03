@@ -69,6 +69,11 @@ const (
 	Op_EVM_Block OpCode = iota + 32
 )
 
+const (
+	Op_Log_Log byte = iota
+	Op_Log_Print
+)
+
 func (opcode OpCode) Encode() []byte {
 	return Uint64ToBytes(uint64(opcode))
 }

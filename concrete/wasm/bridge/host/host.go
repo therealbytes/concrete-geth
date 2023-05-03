@@ -18,6 +18,7 @@ package host
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -181,14 +182,20 @@ func DisabledHostFunc(ctx context.Context, module wz_api.Module, pointer uint64)
 
 func LogHostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
 	mem, _ := NewMemory(ctx, module)
-	_msg := bridge.GetValues(mem, bridge.MemPointer(pointer))
-	log.Debug("wasm:", string(_msg[0]))
+	data := bridge.GetArgs(mem, bridge.MemPointer(pointer))
+	opcode := data[0][0]
+	msg := data[1]
+	if opcode == bridge.Op_Log_Log {
+		log.Debug("wasm:", string(msg))
+	} else {
+		fmt.Println("wasm:", string(msg))
+	}
 	return bridge.NullPointer.Uint64()
 }
 
 func Keccak256HostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
 	mem, _ := NewMemory(ctx, module)
-	data := bridge.GetValues(mem, bridge.MemPointer(pointer))
+	data := bridge.GetArgs(mem, bridge.MemPointer(pointer))
 	hash := crypto.Keccak256(data...)
 	return bridge.PutValue(mem, hash).Uint64()
 }

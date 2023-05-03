@@ -49,7 +49,7 @@ func (pc *BenchmarkPrecompile) Run(api cc_api.API, input []byte) ([]byte, error)
 
 	endTime = std.Now()
 	timeNs = endTime.Sub(startTime).Nanoseconds()
-	std.Log("std.Keccak256Hash", runs, "op", timeNs, "ns", int(timeNs)/runs, "ns/op")
+	std.Print("std.Keccak256Hash", runs, "op", timeNs, "ns", int(timeNs)/runs, "ns/op")
 
 	// crypto.Keccak256Hash
 
@@ -62,11 +62,11 @@ func (pc *BenchmarkPrecompile) Run(api cc_api.API, input []byte) ([]byte, error)
 
 	endTime = std.Now()
 	timeNs = endTime.Sub(startTime).Nanoseconds()
-	std.Log("crypto.Keccak256Hash", runs, "op", timeNs, "ns", int(timeNs)/runs, "ns/op")
+	std.Print("crypto.Keccak256Hash", runs, "op", timeNs, "ns", int(timeNs)/runs, "ns/op")
 
 	runEnd := std.Now()
 
-	std.Log("[internal] BenchmarkPrecompile.Run", runEnd.Sub(runStart).Nanoseconds(), "ns")
+	std.Print("[internal] BenchmarkPrecompile.Run", runEnd.Sub(runStart).Nanoseconds(), "ns")
 
 	return nil, nil
 }
