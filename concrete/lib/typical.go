@@ -35,7 +35,7 @@ func (pc *TypicalPrecompile) MutatesStorage(input []byte) bool {
 }
 
 func (pc *TypicalPrecompile) RequiredGas(input []byte) uint64 {
-	return 2
+	return 10
 }
 
 func (pc *TypicalPrecompile) Finalise(api cc_api.API) error {
