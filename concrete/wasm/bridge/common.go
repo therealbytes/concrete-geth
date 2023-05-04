@@ -15,7 +15,12 @@
 
 package bridge
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 func Uint64ToBytes(value uint64) []byte {
 	data := make([]byte, 8)
@@ -48,6 +53,10 @@ const (
 )
 
 const (
+	Op_StateDB_Many OpCode = iota + 32
+)
+
+const (
 	Op_EVM_BlockHash OpCode = iota
 	Op_EVM_BlockTimestamp
 	Op_EVM_BlockNumber
@@ -56,10 +65,45 @@ const (
 	Op_EVM_BlockCoinbase
 )
 
+const (
+	Op_EVM_Block OpCode = iota + 32
+)
+
+const (
+	Op_Log_Log byte = iota
+	Op_Log_Print
+)
+
 func (opcode OpCode) Encode() []byte {
 	return Uint64ToBytes(uint64(opcode))
 }
 
 func (opcode *OpCode) Decode(data []byte) {
 	*opcode = OpCode(BytesToUint64(data))
+}
+
+type BlockData struct {
+	Timestamp  *big.Int
+	Number     *big.Int
+	Difficulty *big.Int
+	GasLimit   *big.Int
+	Coinbase   common.Address
+}
+
+func (block *BlockData) Encode() []byte {
+	data := make([]byte, 32*4+20)
+	block.Timestamp.FillBytes(data[:32])
+	block.Number.FillBytes(data[32:64])
+	block.Difficulty.FillBytes(data[64:96])
+	block.GasLimit.FillBytes(data[96:128])
+	copy(data[128:148], block.Coinbase.Bytes())
+	return data
+}
+
+func (block *BlockData) Decode(data []byte) {
+	block.Timestamp = new(big.Int).SetBytes(data[:32])
+	block.Number = new(big.Int).SetBytes(data[32:64])
+	block.Difficulty = new(big.Int).SetBytes(data[64:96])
+	block.GasLimit = new(big.Int).SetBytes(data[96:128])
+	block.Coinbase = common.BytesToAddress(data[128:148])
 }

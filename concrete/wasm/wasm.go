@@ -17,7 +17,6 @@ package wasm
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -43,6 +42,7 @@ var (
 	WASM_ADDRESS_CALLER   = "concrete_AddressCaller"
 	WASM_LOG_CALLER       = "concrete_LogCaller"
 	WASM_KECCAK256_CALLER = "concrete_Keccak256Caller"
+	WASM_TIME_CALLER      = "concrete_TimeCaller"
 )
 
 func NewWasmPrecompile(code []byte, address common.Address) cc_api.Precompile {
@@ -59,6 +59,7 @@ type hostConfig struct {
 	address   host.HostFunc
 	log       host.HostFunc
 	keccak256 host.HostFunc
+	time      host.HostFunc
 }
 
 func newHostConfig() *hostConfig {
@@ -68,18 +69,23 @@ func newHostConfig() *hostConfig {
 		address:   host.DisabledHostFunc,
 		log:       host.LogHostFunc,
 		keccak256: host.Keccak256HostFunc,
+		time:      host.TimeHostFunc,
 	}
 }
 
 func newModule(config *hostConfig, code []byte) (wz_api.Module, wazero.Runtime, error) {
 	ctx := context.Background()
-	r := wazero.NewRuntime(ctx)
+	runtimeConfig := wazero.NewRuntimeConfigCompiler().
+		WithMemoryCapacityFromMax(true).
+		WithMemoryLimitPages(64)
+	r := wazero.NewRuntimeWithConfig(ctx, runtimeConfig)
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(config.evm).Export(WASM_EVM_CALLER).
 		NewFunctionBuilder().WithFunc(config.statedb).Export(WASM_STATEDB_CALLER).
 		NewFunctionBuilder().WithFunc(config.address).Export(WASM_ADDRESS_CALLER).
 		NewFunctionBuilder().WithFunc(config.log).Export(WASM_LOG_CALLER).
 		NewFunctionBuilder().WithFunc(config.keccak256).Export(WASM_KECCAK256_CALLER).
+		NewFunctionBuilder().WithFunc(config.time).Export(WASM_TIME_CALLER).
 		Instantiate(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -93,8 +99,8 @@ func newModule(config *hostConfig, code []byte) (wz_api.Module, wazero.Runtime, 
 }
 
 type wasmPrecompile struct {
-	r                 wazero.Runtime
-	mod               wz_api.Module
+	runtime           wazero.Runtime
+	module            wz_api.Module
 	mutex             sync.Mutex
 	memory            bridge.Memory
 	allocator         bridge.Allocator
@@ -121,8 +127,8 @@ func newWasmPrecompile(code []byte, address common.Address) *wasmPrecompile {
 		panic(err)
 	}
 
-	pc.r = r
-	pc.mod = mod
+	pc.runtime = r
+	pc.module = mod
 	pc.memory, pc.allocator = host.NewMemory(context.Background(), mod)
 
 	pc.expIsPure = mod.ExportedFunction(WASM_IS_PURE)
@@ -137,7 +143,7 @@ func newWasmPrecompile(code []byte, address common.Address) *wasmPrecompile {
 
 func (p *wasmPrecompile) close() {
 	ctx := context.Background()
-	p.r.Close(ctx)
+	p.runtime.Close(ctx)
 }
 
 func (p *wasmPrecompile) call__Uint64(expFunc wz_api.Function) uint64 {
@@ -162,7 +168,6 @@ func (p *wasmPrecompile) call_Bytes_Uint64(expFunc wz_api.Function, input []byte
 	defer p.allocator.Free(pointer)
 	_ret, err := expFunc.Call(ctx, pointer.Uint64())
 	if err != nil {
-		fmt.Println("err", err)
 		panic(err)
 	}
 	return _ret[0]

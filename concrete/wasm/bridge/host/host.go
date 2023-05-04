@@ -18,7 +18,9 @@ package host
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
@@ -40,14 +42,14 @@ var (
 
 type allocator struct {
 	ctx       context.Context
-	mod       wz_api.Module
+	module    wz_api.Module
 	expMalloc wz_api.Function
 	expFree   wz_api.Function
 	expPrune  wz_api.Function
 }
 
-func NewAllocator(ctx context.Context, mod wz_api.Module) bridge.Allocator {
-	return &allocator{ctx: ctx, mod: mod}
+func NewAllocator(ctx context.Context, module wz_api.Module) bridge.Allocator {
+	return &allocator{ctx: ctx, module: module}
 }
 
 func (a *allocator) Malloc(size uint32) bridge.MemPointer {
@@ -55,7 +57,7 @@ func (a *allocator) Malloc(size uint32) bridge.MemPointer {
 		return bridge.NullPointer
 	}
 	if a.expMalloc == nil {
-		a.expMalloc = a.mod.ExportedFunction(WASM_MALLOC)
+		a.expMalloc = a.module.ExportedFunction(WASM_MALLOC)
 	}
 	_offset, err := a.expMalloc.Call(a.ctx, uint64(size))
 	if err != nil {
@@ -71,7 +73,7 @@ func (a *allocator) Free(pointer bridge.MemPointer) {
 		return
 	}
 	if a.expFree == nil {
-		a.expFree = a.mod.ExportedFunction(WASM_FREE)
+		a.expFree = a.module.ExportedFunction(WASM_FREE)
 	}
 	_, err := a.expFree.Call(a.ctx, uint64(pointer.Offset()))
 	if err != nil {
@@ -81,7 +83,7 @@ func (a *allocator) Free(pointer bridge.MemPointer) {
 
 func (a *allocator) Prune() {
 	if a.expPrune == nil {
-		a.expPrune = a.mod.ExportedFunction(WASM_PRUNE)
+		a.expPrune = a.module.ExportedFunction(WASM_PRUNE)
 	}
 	_, err := a.expPrune.Call(a.ctx)
 	if err != nil {
@@ -93,8 +95,8 @@ type memory struct {
 	allocator
 }
 
-func NewMemory(ctx context.Context, mod wz_api.Module) (bridge.Memory, bridge.Allocator) {
-	alloc := &allocator{ctx: ctx, mod: mod}
+func NewMemory(ctx context.Context, module wz_api.Module) (bridge.Memory, bridge.Allocator) {
+	alloc := &allocator{ctx: ctx, module: module}
 	return &memory{allocator: *alloc}, alloc
 }
 
@@ -107,7 +109,7 @@ func (m *memory) Write(data []byte) bridge.MemPointer {
 		return bridge.NullPointer
 	}
 	pointer := m.Malloc(uint32(len(data)))
-	ok := m.mod.Memory().Write(pointer.Offset(), data)
+	ok := m.module.Memory().Write(pointer.Offset(), data)
 	if !ok {
 		panic(ErrMemoryReadOutOfRange)
 	}
@@ -118,7 +120,7 @@ func (m *memory) Read(pointer bridge.MemPointer) []byte {
 	if pointer.IsNull() {
 		return []byte{}
 	}
-	output, ok := m.mod.Memory().Read(pointer.Offset(), pointer.Size())
+	output, ok := m.module.Memory().Read(pointer.Offset(), pointer.Size())
 	if !ok {
 		panic(ErrMemoryReadOutOfRange)
 	}
@@ -128,15 +130,29 @@ func (m *memory) Read(pointer bridge.MemPointer) []byte {
 type HostFunc func(ctx context.Context, module wz_api.Module, pointer uint64) uint64
 
 func NewStateDBHostFunc(apiGetter func() cc_api.API) HostFunc {
-	return func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+	return func(ctx context.Context, module wz_api.Module, _pointer uint64) uint64 {
+		statedb := apiGetter().StateDB()
 		mem, _ := NewMemory(ctx, module)
-		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
-		var opcode bridge.OpCode
-		opcode.Decode(args[0])
-		args = args[1:]
-		out := CallStateDB(apiGetter().StateDB(), opcode, args)
-		ptr := bridge.PutValue(mem, out).Uint64()
-		return ptr
+
+		var handleCall func(pointer bridge.MemPointer) []byte
+		handleCall = func(pointer bridge.MemPointer) []byte {
+			args := bridge.GetArgs(mem, pointer)
+			var opcode bridge.OpCode
+			opcode.Decode(args[0])
+			args = args[1:]
+
+			if opcode == bridge.Op_StateDB_Many {
+				for _, ptr := range bridge.UnpackPointers(args[0]) {
+					handleCall(ptr)
+				}
+				return nil
+			} else {
+				return CallStateDB(statedb, opcode, args)
+			}
+		}
+
+		out := handleCall(bridge.MemPointer(_pointer))
+		return bridge.PutValue(mem, out).Uint64()
 	}
 }
 
@@ -165,16 +181,26 @@ func DisabledHostFunc(ctx context.Context, module wz_api.Module, pointer uint64)
 
 func LogHostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
 	mem, _ := NewMemory(ctx, module)
-	_msg := bridge.GetValues(mem, bridge.MemPointer(pointer))
-	log.Debug("wasm:", string(_msg[0]))
+	data := bridge.GetArgs(mem, bridge.MemPointer(pointer))
+	opcode := data[0][0]
+	msg := data[1]
+	if opcode == bridge.Op_Log_Log {
+		log.Debug("wasm:", string(msg))
+	} else {
+		fmt.Println("wasm:", string(msg))
+	}
 	return bridge.NullPointer.Uint64()
 }
 
 func Keccak256HostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
 	mem, _ := NewMemory(ctx, module)
-	data := bridge.GetValues(mem, bridge.MemPointer(pointer))
+	data := bridge.GetArgs(mem, bridge.MemPointer(pointer))
 	hash := crypto.Keccak256(data...)
 	return bridge.PutValue(mem, hash).Uint64()
+}
+
+func TimeHostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
+	return uint64(time.Now().UnixNano())
 }
 
 func CallStateDB(db cc_api.StateDB, opcode bridge.OpCode, args [][]byte) []byte {
@@ -263,6 +289,16 @@ func CallEVM(evm cc_api.EVM, opcode bridge.OpCode, args [][]byte) []byte {
 	case bridge.Op_EVM_BlockCoinbase:
 		coinbase := evm.BlockCoinbase()
 		return coinbase.Bytes()
+
+	case bridge.Op_EVM_Block:
+		block := bridge.BlockData{
+			Timestamp:  evm.BlockTimestamp(),
+			Number:     evm.BlockNumber(),
+			Difficulty: evm.BlockDifficulty(),
+			GasLimit:   evm.BlockGasLimit(),
+			Coinbase:   evm.BlockCoinbase(),
+		}
+		return block.Encode()
 	}
 
 	return nil

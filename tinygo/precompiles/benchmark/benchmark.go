@@ -16,23 +16,12 @@
 package main
 
 import (
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/tinygo"
-	"github.com/ethereum/go-ethereum/tinygo/std"
 )
 
-type log struct {
-	lib.BlankPrecompile
-}
-
-func (pc *log) Run(api cc_api.API, input []byte) ([]byte, error) {
-	std.Log(string(input))
-	return input, nil
-}
-
 func init() {
-	tinygo.WasmWrap(&log{}, true)
+	tinygo.WasmWrap(&lib.BenchmarkPrecompile{})
 }
 
 // main is REQUIRED for TinyGo to compile to Wasm

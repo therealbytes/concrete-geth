@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package mem
+package infra
 
 import (
 	"reflect"
@@ -21,6 +21,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 )
+
+var Memory bridge.Memory = &memory{}
+var Allocator bridge.Allocator = &allocator{}
 
 var allocs = make(map[uintptr][]byte)
 
@@ -77,8 +80,6 @@ func (m *memory) Read(pointer bridge.MemPointer) []byte {
 	}))
 }
 
-var Memory bridge.Memory = &memory{}
-
 type allocator struct{}
 
 func (m *allocator) Malloc(size uint32) bridge.MemPointer {
@@ -95,5 +96,3 @@ func (m *allocator) Free(pointer bridge.MemPointer) {
 func (m *allocator) Prune() {
 	Prune()
 }
-
-var Allocator bridge.Allocator = &allocator{}

@@ -20,68 +20,108 @@ import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
-	"github.com/ethereum/go-ethereum/tinygo/mem"
+	"github.com/ethereum/go-ethereum/tinygo/infra"
 )
+
+var precompile cc_api.Precompile
+var precompileConfig WasmConfig
+var precompileAddress common.Address
+
+type WasmConfig struct {
+	IsPure       bool
+	CacheProxies bool
+}
+
+func (c WasmConfig) cacheProxies() bool {
+	return c.CacheProxies && !c.IsPure
+}
+
+var DefaultConfig = WasmConfig{
+	IsPure:       false,
+	CacheProxies: false,
+}
+
+func WasmWrap(pc cc_api.Precompile) {
+	precompile = pc
+	precompileConfig = DefaultConfig
+}
+
+func WasmWrapWithConfig(pc cc_api.Precompile, config WasmConfig) {
+	precompile = pc
+	precompileConfig = config
+}
 
 // Note: This uses a uint64 instead of two result values for compatibility with
 // WebAssembly 1.0.
 
-var precompile cc_api.Precompile
-var precompileIsPure bool
-var precompileAddress common.Address
-
-func WasmWrap(pc cc_api.Precompile, isPure bool) {
-	precompile = pc
-	precompileIsPure = isPure
-}
-
 //go:wasm-module env
 //export concrete_EvmCaller
-func _EvmCaller(pointer uint64) uint64
+func _evmCaller(pointer uint64) uint64
 
-func EvmCaller(pointer uint64) uint64 {
-	return _EvmCaller(pointer)
+func evmCaller(pointer uint64) uint64 {
+	return _evmCaller(pointer)
 }
 
 //go:wasm-module env
 //export concrete_StateDBCaller
-func _StateDBCaller(pointer uint64) uint64
+func _stateDBCaller(pointer uint64) uint64
 
-func StateDBCaller(pointer uint64) uint64 {
-	return _StateDBCaller(pointer)
+func stateDBCaller(pointer uint64) uint64 {
+	return _stateDBCaller(pointer)
 }
 
 //go:wasm-module env
 //export concrete_AddressCaller
-func _AddressCaller(pointer uint64) uint64
+func _addressCaller(pointer uint64) uint64
 
-func AddressCaller() common.Address {
-	address := wasm.Call_BytesArr_Bytes(mem.Memory, mem.Allocator, func(pointer uint64) uint64 { return _AddressCaller(pointer) }, nil)
+func addressCaller() common.Address {
+	address := wasm.Call_BytesArr_Bytes(infra.Memory, infra.Allocator, func(pointer uint64) uint64 { return _addressCaller(pointer) }, nil)
 	return common.BytesToAddress(address)
 }
 
-func GetAddress() common.Address {
+func getAddress() common.Address {
 	if precompileAddress == (common.Address{}) {
-		precompileAddress = AddressCaller()
+		precompileAddress = addressCaller()
 	}
 	return precompileAddress
 }
 
-func NewAPI() cc_api.API {
-	evm := wasm.NewProxyEVM(mem.Memory, mem.Allocator, EvmCaller, StateDBCaller)
-	address := GetAddress()
+func newAPI() cc_api.API {
+	var statedb cc_api.StateDB
+	if precompileConfig.cacheProxies() {
+		statedb = wasm.NewCachedProxyStateDB(infra.Memory, infra.Allocator, stateDBCaller)
+	} else {
+		statedb = wasm.NewProxyStateDB(infra.Memory, infra.Allocator, stateDBCaller)
+	}
+	evm := wasm.NewProxyEVMWithStateDB(infra.Memory, infra.Allocator, evmCaller, statedb)
+	address := getAddress()
 	return cc_api.New(evm, address)
 }
 
-func NewCommitSafeStateAPI() cc_api.API {
-	statedb := wasm.NewProxyStateDB(mem.Memory, mem.Allocator, StateDBCaller)
-	address := GetAddress()
+func newCommitSafeStateAPI() cc_api.API {
+	var statedb cc_api.StateDB
+	if precompileConfig.cacheProxies() {
+		statedb = wasm.NewCachedProxyStateDB(infra.Memory, infra.Allocator, stateDBCaller)
+	} else {
+		statedb = wasm.NewProxyStateDB(infra.Memory, infra.Allocator, stateDBCaller)
+	}
+	address := getAddress()
 	return cc_api.NewStateAPI(cc_api.NewCommitSafeStateDB(statedb), address)
 }
 
+func commitProxyCache(api cc_api.API) {
+	if !precompileConfig.cacheProxies() {
+		return
+	}
+	statedb := api.StateDB()
+	if proxy, ok := statedb.(*wasm.CachedProxyStateDB); ok {
+		proxy.Commit()
+	}
+}
+
 //export concrete_IsPure
-func IsPure() uint64 {
-	if precompileIsPure {
+func isPure() uint64 {
+	if precompileConfig.IsPure {
 		return 1
 	} else {
 		return 0
@@ -89,8 +129,8 @@ func IsPure() uint64 {
 }
 
 //export concrete_MutatesStorage
-func MutatesStorage(pointer uint64) uint64 {
-	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
+func mutatesStorage(pointer uint64) uint64 {
+	input := bridge.GetValue(infra.Memory, bridge.MemPointer(pointer))
 	if precompile.MutatesStorage(input) {
 		return 1
 	} else {
@@ -99,30 +139,33 @@ func MutatesStorage(pointer uint64) uint64 {
 }
 
 //export concrete_RequiredGas
-func RequiredGas(pointer uint64) uint64 {
-	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
+func requiredGas(pointer uint64) uint64 {
+	input := bridge.GetValue(infra.Memory, bridge.MemPointer(pointer))
 	gas := precompile.RequiredGas(input)
 	return uint64(gas)
 }
 
 //export concrete_Finalise
-func Finalise() uint64 {
-	api := NewCommitSafeStateAPI()
+func finalise() uint64 {
+	api := newCommitSafeStateAPI()
 	precompile.Finalise(api)
+	commitProxyCache(api)
 	return bridge.NullPointer.Uint64()
 }
 
 //export concrete_Commit
-func Commit() uint64 {
-	api := NewCommitSafeStateAPI()
+func commit() uint64 {
+	api := newCommitSafeStateAPI()
 	precompile.Commit(api)
+	commitProxyCache(api)
 	return bridge.NullPointer.Uint64()
 }
 
 //export concrete_Run
-func Run(pointer uint64) uint64 {
-	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
-	api := NewAPI()
+func run(pointer uint64) uint64 {
+	input := bridge.GetValue(infra.Memory, bridge.MemPointer(pointer))
+	api := newAPI()
 	output, err := precompile.Run(api, input)
-	return bridge.PutReturnWithError(mem.Memory, [][]byte{output}, err).Uint64()
+	commitProxyCache(api)
+	return bridge.PutReturnWithError(infra.Memory, [][]byte{output}, err).Uint64()
 }
