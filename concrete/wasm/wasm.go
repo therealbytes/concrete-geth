@@ -17,7 +17,6 @@ package wasm
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -169,7 +168,6 @@ func (p *wasmPrecompile) call_Bytes_Uint64(expFunc wz_api.Function, input []byte
 	defer p.allocator.Free(pointer)
 	_ret, err := expFunc.Call(ctx, pointer.Uint64())
 	if err != nil {
-		fmt.Println("err", err)
 		panic(err)
 	}
 	return _ret[0]
