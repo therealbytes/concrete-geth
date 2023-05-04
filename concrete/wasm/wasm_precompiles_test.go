@@ -16,8 +16,8 @@
 package wasm
 
 import (
-	"context"
 	_ "embed"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -26,101 +26,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/lib"
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
-	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/host"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
-	wz_api "github.com/tetratelabs/wazero/api"
 )
-
-//go:embed bin/echo.wasm
-var echoCode []byte
-
-//go:embed bin/log.wasm
-var logCode []byte
 
 //go:embed bin/typical.wasm
 var typicalCode []byte
 
-func TestWasmLog(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	statedb := NewTestStateDB()
-	evm := NewTestEVM(statedb)
-	api := cc_api.New(evm, address)
-	hostConfig := newHostConfig()
-
-	var lastLog string
-	hostConfig.log = func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
-		mem, _ := host.NewMemory(ctx, module)
-		_msg := bridge.GetValues(mem, bridge.MemPointer(pointer))
-		lastLog = string(_msg[0])
-		return bridge.NullPointer.Uint64()
-	}
-	hostConfig.address = host.NewAddressHostFunc(address)
-
-	ctx := context.Background()
-	mod, r, err := newModule(hostConfig, logCode)
-	require.NoError(t, err)
-
-	pc := &wasmPrecompile{}
-	pc.r = r
-	pc.mod = mod
-	pc.memory, pc.allocator = host.NewMemory(ctx, mod)
-	pc.expRun = mod.ExportedFunction(WASM_RUN)
-	defer pc.close()
-
-	str1 := "hello world"
-	str2 := "bye world"
-	pc.Run(api, []byte(str1))
-	require.Equal(t, str1, lastLog)
-	pc.Run(api, []byte(str2))
-	require.Equal(t, str2, lastLog)
-}
-
-func TestStatelessPrecompile(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	pc := NewWasmPrecompile(echoCode, address)
-	var api cc_api.API
-
-	require.IsType(t, &statelessWasmPrecompile{}, pc)
-
-	testMutatesStorage := func(wg *sync.WaitGroup) {
-		defer wg.Done()
-		require.False(t, pc.MutatesStorage([]byte("hello world")))
-	}
-	testFinalise := func(wg *sync.WaitGroup) {
-		defer wg.Done()
-		require.NoError(t, pc.Finalise(api))
-	}
-	testCommit := func(wg *sync.WaitGroup) {
-		defer wg.Done()
-		require.NoError(t, pc.Commit(api))
-	}
-	testRun := func(data []byte, wg *sync.WaitGroup) {
-		defer wg.Done()
-		result, err := pc.Run(api, data)
-		require.NoError(t, err)
-		require.Equal(t, data, result)
-	}
-	testRequiredGas := func(data []byte, wg *sync.WaitGroup) {
-		defer wg.Done()
-		gas := pc.RequiredGas(data)
-		require.Equal(t, uint64(data[0]), gas)
-	}
-
-	var wg sync.WaitGroup
-	routines := 10 * 5
-	wg.Add(routines)
-	for ii := 0; ii < routines/5; ii++ {
-		data := []byte{byte(ii)}
-		go testMutatesStorage(&wg)
-		go testFinalise(&wg)
-		go testCommit(&wg)
-		go testRun(data, &wg)
-		go testRequiredGas(data, &wg)
-	}
-	wg.Wait()
-}
+//go:embed bin/benchmark.wasm
+var benchmarkCode []byte
 
 func TestStatefulPrecompile(t *testing.T) {
 	address := common.HexToAddress("0x01")
@@ -163,36 +77,11 @@ func newBenchmarkAPI(address common.Address) cc_api.API {
 	return api
 }
 
-func BenchmarkNativeEchoPrecompile(b *testing.B) {
-	address := common.HexToAddress("0x01")
-	api := newBenchmarkAPI(address)
-	pc := lib.EchoPrecompile{}
-	input := []byte("hello world")
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		pc.Run(api, input)
-	}
-}
-
-func BenchmarkWasmEchoPrecompile(b *testing.B) {
-	address := common.HexToAddress("0x01")
-	api := newBenchmarkAPI(address)
-	pc := NewWasmPrecompile(echoCode, address)
-	input := []byte("hello world")
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		pc.Run(api, input)
-	}
-}
-
 func BenchmarkNativeTypicalPrecompile(b *testing.B) {
 	address := common.HexToAddress("0x01")
 	api := newBenchmarkAPI(address)
 	pc := lib.TypicalPrecompile{}
-	preimage := []byte("hello world")
-
+	preimage := crypto.Keccak256([]byte("hello world"))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pc.Run(api, preimage)
@@ -203,10 +92,29 @@ func BenchmarkWasmTypicalPrecompile(b *testing.B) {
 	address := common.HexToAddress("0x01")
 	api := newBenchmarkAPI(address)
 	pc := NewWasmPrecompile(typicalCode, address)
-	preimage := []byte("hello world")
-
+	preimage := crypto.Keccak256([]byte("hello world"))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pc.Run(api, preimage)
 	}
+}
+
+func TestNativeBenchmarkPrecompile(t *testing.T) {
+	address := common.HexToAddress("0x01")
+	api := newBenchmarkAPI(address)
+	pc := lib.BenchmarkPrecompile{}
+	start := time.Now()
+	pc.Run(api, nil)
+	end := time.Now()
+	fmt.Println("[external] BenchmarkPrecompile.Run", end.Sub(start).Nanoseconds(), "ns")
+}
+
+func TestWasmBenchmarkPrecompile(t *testing.T) {
+	address := common.HexToAddress("0x01")
+	api := newBenchmarkAPI(address)
+	pc := NewWasmPrecompile(benchmarkCode, address)
+	start := time.Now()
+	pc.Run(api, nil)
+	end := time.Now()
+	fmt.Println("[external] BenchmarkPrecompile.Run", end.Sub(start).Nanoseconds(), "ns")
 }
