@@ -36,7 +36,7 @@ var typicalCode []byte
 //go:embed bin/benchmark.wasm
 var benchmarkCode []byte
 
-func TestStatefulPrecompile(t *testing.T) {
+func TestWasmPrecompile(t *testing.T) {
 	address := common.HexToAddress("0x01")
 	pc := NewWasmPrecompile(typicalCode, address)
 
