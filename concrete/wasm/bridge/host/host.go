@@ -134,8 +134,8 @@ func NewStateDBHostFunc(apiGetter func() cc_api.API) HostFunc {
 		statedb := apiGetter().StateDB()
 		mem, _ := NewMemory(ctx, module)
 
-		var handleCall func(pointer bridge.MemPointer) bridge.MemPointer
-		handleCall = func(pointer bridge.MemPointer) bridge.MemPointer {
+		var handleCall func(pointer bridge.MemPointer) []byte
+		handleCall = func(pointer bridge.MemPointer) []byte {
 			args := bridge.GetArgs(mem, pointer)
 			var opcode bridge.OpCode
 			opcode.Decode(args[0])
@@ -145,15 +145,14 @@ func NewStateDBHostFunc(apiGetter func() cc_api.API) HostFunc {
 				for _, ptr := range bridge.UnpackPointers(args[0]) {
 					handleCall(ptr)
 				}
-				return bridge.NullPointer
+				return nil
 			} else {
-				out := CallStateDB(statedb, opcode, args)
-				ptr := bridge.PutValue(mem, out)
-				return ptr
+				return CallStateDB(statedb, opcode, args)
 			}
 		}
 
-		return handleCall(bridge.MemPointer(_pointer)).Uint64()
+		out := handleCall(bridge.MemPointer(_pointer))
+		return bridge.PutValue(mem, out).Uint64()
 	}
 }
 
