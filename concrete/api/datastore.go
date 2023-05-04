@@ -112,7 +112,7 @@ type mapping struct {
 }
 
 func (m *mapping) key(key common.Hash) common.Hash {
-	return crypto.Keccak256Hash(m.id.Bytes(), key.Bytes())
+	return crypto.Keccak256Hash(key.Bytes(), m.id.Bytes())
 }
 
 func (m *mapping) Datastore() Datastore {
@@ -155,12 +155,22 @@ type Array interface {
 }
 
 type array struct {
-	ds Datastore
-	id common.Hash
+	ds     Datastore
+	id     common.Hash
+	idHash common.Hash
+}
+
+func (a *array) getIdHash() common.Hash {
+	if a.idHash == (common.Hash{}) {
+		a.idHash = crypto.Keccak256Hash(a.id.Bytes())
+	}
+	return a.idHash
 }
 
 func (a *array) key(index int) common.Hash {
-	return crypto.Keccak256Hash(a.id.Bytes(), common.BigToHash(big.NewInt(int64(index))).Bytes())
+	a.getIdHash()
+	slot := new(big.Int).Add(a.idHash.Big(), big.NewInt(int64(index)))
+	return common.BigToHash(slot)
 }
 
 func (a *array) setLength(length int) {
@@ -242,16 +252,35 @@ type Set interface {
 }
 
 type set struct {
-	ds Datastore
-	id common.Hash
+	ds      Datastore
+	id      common.Hash
+	idHash  common.Hash
+	array   Array
+	mapping Mapping
 }
 
-func (s *set) indexMap() Mapping {
-	return s.ds.NewMap(crypto.Keccak256Hash(s.id.Bytes(), []byte{0}))
+func (s *set) getIdHash() common.Hash {
+	if s.idHash == (common.Hash{}) {
+		s.idHash = crypto.Keccak256Hash(s.id.Bytes())
+	}
+	return s.idHash
 }
 
 func (s *set) valueArray() Array {
-	return s.ds.NewArray(crypto.Keccak256Hash(s.id.Bytes(), []byte{1}))
+	if s.array == nil {
+		s.getIdHash()
+		s.array = s.ds.NewArray(s.idHash)
+	}
+	return s.array
+}
+
+func (s *set) indexMap() Mapping {
+	if s.mapping == nil {
+		s.getIdHash()
+		keyBN := new(big.Int).Add(s.idHash.Big(), common.Big1)
+		s.mapping = s.ds.NewMap(common.BigToHash(keyBN))
+	}
+	return s.mapping
 }
 
 func (s *set) Datastore() Datastore {
