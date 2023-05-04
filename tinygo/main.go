@@ -114,6 +114,9 @@ func commitProxyCache(api cc_api.API) {
 		return
 	}
 	statedb := api.StateDB()
+	if _statedb, ok := statedb.(*cc_api.CommitSafeStateDB); ok {
+		statedb = _statedb.StateDB
+	}
 	if proxy, ok := statedb.(*wasm.CachedProxyStateDB); ok {
 		proxy.Commit()
 	}
