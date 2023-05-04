@@ -69,8 +69,8 @@ func (s *readWriteStorage) Get(key common.Hash) common.Hash {
 	return s.read.Get(key)
 }
 
-func (s *readWriteStorage) AddPreimage(preimage []byte) {
-	s.write.AddPreimage(preimage)
+func (s *readWriteStorage) AddPreimage(preimage []byte) common.Hash {
+	return s.write.AddPreimage(preimage)
 }
 
 func (s *readWriteStorage) HasPreimage(hash common.Hash) bool {

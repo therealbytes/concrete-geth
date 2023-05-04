@@ -127,10 +127,14 @@ type Storage interface {
 	Address() common.Address
 	Set(key common.Hash, value common.Hash)
 	Get(key common.Hash) common.Hash
-	AddPreimage(preimage []byte)
+	AddPreimage(preimage []byte) common.Hash
 	HasPreimage(hash common.Hash) bool
 	GetPreimage(hash common.Hash) []byte
 	GetPreimageSize(hash common.Hash) int
+}
+
+func hashRegistryKey(hash common.Hash) common.Hash {
+	return crypto.Keccak256Hash(hash.Bytes(), common.Big0.Bytes())
 }
 
 type PersistentStorage struct {
@@ -150,20 +154,21 @@ func (s *PersistentStorage) Get(key common.Hash) common.Hash {
 	return s.db.GetPersistentState(s.address, key)
 }
 
-func (s *PersistentStorage) AddPreimage(preimage []byte) {
+func (s *PersistentStorage) AddPreimage(preimage []byte) common.Hash {
 	if len(preimage) == 0 {
-		return
+		return EmptyPreimageHash
 	}
 	hash := crypto.Keccak256Hash(preimage)
-	s.db.SetPersistentState(HashRegistryAddress, hash, common.BytesToHash(common.Big1.Bytes()))
+	s.db.SetPersistentState(HashRegistryAddress, hashRegistryKey(hash), common.BytesToHash(common.Big1.Bytes()))
 	s.db.AddPersistentPreimage(hash, preimage)
+	return hash
 }
 
 func (s *PersistentStorage) HasPreimage(hash common.Hash) bool {
 	if hash == EmptyPreimageHash {
 		return true
 	}
-	return s.db.GetPersistentState(HashRegistryAddress, hash) == common.BytesToHash(common.Big1.Bytes())
+	return s.db.GetPersistentState(HashRegistryAddress, hashRegistryKey(hash)) == common.BytesToHash(common.Big1.Bytes())
 }
 
 func (s *PersistentStorage) GetPreimage(hash common.Hash) []byte {
@@ -205,20 +210,21 @@ func (s *EphemeralStorage) Get(key common.Hash) common.Hash {
 	return s.db.GetEphemeralState(s.address, key)
 }
 
-func (s *EphemeralStorage) AddPreimage(preimage []byte) {
+func (s *EphemeralStorage) AddPreimage(preimage []byte) common.Hash {
 	if len(preimage) == 0 {
-		return
+		return EmptyPreimageHash
 	}
 	hash := crypto.Keccak256Hash(preimage)
-	s.db.SetEphemeralState(HashRegistryAddress, hash, common.BytesToHash(common.Big1.Bytes()))
+	s.db.SetEphemeralState(HashRegistryAddress, hashRegistryKey(hash), common.BytesToHash(common.Big1.Bytes()))
 	s.db.AddEphemeralPreimage(hash, preimage)
+	return hash
 }
 
 func (s *EphemeralStorage) HasPreimage(hash common.Hash) bool {
 	if hash == EmptyPreimageHash {
 		return true
 	}
-	return s.db.GetEphemeralState(HashRegistryAddress, hash) == common.BytesToHash(common.Big1.Bytes())
+	return s.db.GetEphemeralState(HashRegistryAddress, hashRegistryKey(hash)) == common.BytesToHash(common.Big1.Bytes())
 }
 
 func (s *EphemeralStorage) GetPreimage(hash common.Hash) []byte {
