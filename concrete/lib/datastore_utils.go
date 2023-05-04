@@ -47,3 +47,65 @@ func (c *Counter) Add(delta *big.Int) {
 func (c *Counter) Inc() {
 	c.Add(common.Big1)
 }
+
+type nestedMap struct {
+	cc_api.Mapping
+	depth int
+}
+
+func NewNestedMap(mapping cc_api.Mapping, depth int) cc_api.Mapping {
+	if depth < 2 {
+		panic("depth must be at least 2")
+	}
+	return &nestedMap{mapping, depth}
+}
+
+func (m *nestedMap) GetNested(keys ...common.Hash) common.Hash {
+	if len(keys) != m.depth {
+		panic("wrong number of keys")
+	}
+	Array := m.GetNestedMap(keys[0 : m.depth-1]...)
+	return Array.Get(keys[m.depth-1])
+}
+
+func (m *nestedMap) GetNestedMap(keys ...common.Hash) cc_api.Mapping {
+	if len(keys) != m.depth-1 {
+		panic("wrong number of keys")
+	}
+	next := m.Mapping
+	for ii := 0; ii < m.depth-1; ii++ {
+		next = next.GetMap(keys[ii])
+	}
+	return next
+}
+
+type nestedArray struct {
+	cc_api.Array
+	depth int
+}
+
+func NewNestedArray(array cc_api.Array, depth int) cc_api.Array {
+	if depth < 2 {
+		panic("depth must be at least 2")
+	}
+	return &nestedArray{array, depth}
+}
+
+func (m *nestedArray) GetNested(indexes ...int) common.Hash {
+	if len(indexes) != m.depth {
+		panic("wrong number of indexes")
+	}
+	Array := m.GetNestedArray(indexes[0 : m.depth-1]...)
+	return Array.Get(indexes[m.depth-1])
+}
+
+func (m *nestedArray) GetNestedArray(indexes ...int) cc_api.Array {
+	if len(indexes) != m.depth-1 {
+		panic("wrong number of indexes")
+	}
+	next := m.Array
+	for ii := 0; ii < m.depth-1; ii++ {
+		next = next.GetArray(indexes[ii])
+	}
+	return next
+}

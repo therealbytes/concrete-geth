@@ -102,8 +102,10 @@ type Mapping interface {
 	Datastore() Datastore
 	Id() common.Hash
 	Get(key common.Hash) common.Hash
-	GetReference(key common.Hash) Reference
 	Set(key common.Hash, value common.Hash)
+	GetReference(key common.Hash) Reference
+	GetMap(key common.Hash) Mapping
+	GetArray(key common.Hash) Array
 }
 
 type mapping struct {
@@ -127,6 +129,10 @@ func (m *mapping) Get(key common.Hash) common.Hash {
 	return m.ds.Get(m.key(key))
 }
 
+func (m *mapping) Set(key common.Hash, value common.Hash) {
+	m.ds.Set(m.key(key), value)
+}
+
 func (m *mapping) GetReference(key common.Hash) Reference {
 	return &reference{
 		key: m.key(key),
@@ -134,8 +140,18 @@ func (m *mapping) GetReference(key common.Hash) Reference {
 	}
 }
 
-func (m *mapping) Set(key common.Hash, value common.Hash) {
-	m.ds.Set(m.key(key), value)
+func (m *mapping) GetMap(key common.Hash) Mapping {
+	return &mapping{
+		id: m.key(key),
+		ds: m.ds,
+	}
+}
+
+func (m *mapping) GetArray(key common.Hash) Array {
+	return &array{
+		id: m.key(key),
+		ds: m.ds,
+	}
 }
 
 var _ Mapping = (*mapping)(nil)
@@ -147,11 +163,13 @@ type Array interface {
 	Id() common.Hash
 	Length() int
 	Get(index int) common.Hash
-	GetReference(key int) Reference
 	Set(index int, value common.Hash)
 	Push(value common.Hash)
 	Pop() common.Hash
 	Swap(i, j int)
+	GetReference(key int) Reference
+	GetMap(key int) Mapping
+	GetArray(key int) Array
 }
 
 type array struct {
@@ -200,13 +218,6 @@ func (a *array) Get(index int) common.Hash {
 	return a.ds.Get(a.key(index))
 }
 
-func (a *array) GetReference(key int) Reference {
-	return &reference{
-		ds:  a.ds,
-		key: a.key(key),
-	}
-}
-
 func (a *array) Set(index int, value common.Hash) {
 	if index >= a.Length() {
 		panic("index out of bounds")
@@ -237,6 +248,27 @@ func (a *array) Swap(i, j int) {
 	iVal := a.Get(i)
 	a.Set(i, a.Get(j))
 	a.Set(j, iVal)
+}
+
+func (a *array) GetReference(key int) Reference {
+	return &reference{
+		ds:  a.ds,
+		key: a.key(key),
+	}
+}
+
+func (a *array) GetMap(key int) Mapping {
+	return &mapping{
+		ds: a.ds,
+		id: a.key(key),
+	}
+}
+
+func (a *array) GetArray(key int) Array {
+	return &array{
+		ds: a.ds,
+		id: a.key(key),
+	}
 }
 
 var _ Array = (*array)(nil)
