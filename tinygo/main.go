@@ -148,16 +148,16 @@ func requiredGas(pointer uint64) uint64 {
 //export concrete_Finalise
 func finalise() uint64 {
 	api := newCommitSafeStateAPI()
-	defer commitProxyCache(api)
 	precompile.Finalise(api)
+	commitProxyCache(api)
 	return bridge.NullPointer.Uint64()
 }
 
 //export concrete_Commit
 func commit() uint64 {
 	api := newCommitSafeStateAPI()
-	defer commitProxyCache(api)
 	precompile.Commit(api)
+	commitProxyCache(api)
 	return bridge.NullPointer.Uint64()
 }
 
@@ -165,7 +165,7 @@ func commit() uint64 {
 func run(pointer uint64) uint64 {
 	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
 	api := newAPI()
-	defer commitProxyCache(api)
 	output, err := precompile.Run(api, input)
+	commitProxyCache(api)
 	return bridge.PutReturnWithError(mem.Memory, [][]byte{output}, err).Uint64()
 }
