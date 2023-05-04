@@ -49,7 +49,7 @@ type ProxyStateDB struct {
 	Proxy
 }
 
-func NewProxyStateDB(memory bridge.Memory, allocator bridge.Allocator, stateDBCaller HostFuncCaller) *ProxyStateDB {
+func NewProxyStateDB(memory bridge.Memory, allocator bridge.Allocator, stateDBCaller HostFuncCaller) api.StateDB {
 	return &ProxyStateDB{Proxy{memory: memory, allocator: allocator, caller: stateDBCaller}}
 }
 
@@ -150,7 +150,7 @@ type CachedProxyStateDB struct {
 	ephemeralPreimagesDirty  map[common.Hash]struct{}
 }
 
-func NewCachedProxyStateDB(memory bridge.Memory, allocator bridge.Allocator, stateDBCaller HostFuncCaller) *CachedProxyStateDB {
+func NewCachedProxyStateDB(memory bridge.Memory, allocator bridge.Allocator, stateDBCaller HostFuncCaller) api.StateDB {
 	p := &CachedProxyStateDB{}
 	p.memory = memory
 	p.allocator = allocator
@@ -312,12 +312,12 @@ type ProxyEVM struct {
 	db api.StateDB
 }
 
-func NewProxyEVM(memory bridge.Memory, allocator bridge.Allocator, evmCaller HostFuncCaller, stateDBCaller HostFuncCaller) *ProxyEVM {
+func NewProxyEVM(memory bridge.Memory, allocator bridge.Allocator, evmCaller HostFuncCaller, stateDBCaller HostFuncCaller) api.EVM {
 	statedb := NewProxyStateDB(memory, allocator, stateDBCaller)
 	return NewProxyEVMWithStateDB(memory, allocator, evmCaller, statedb)
 }
 
-func NewProxyEVMWithStateDB(memory bridge.Memory, allocator bridge.Allocator, evmCaller HostFuncCaller, statedb api.StateDB) *ProxyEVM {
+func NewProxyEVMWithStateDB(memory bridge.Memory, allocator bridge.Allocator, evmCaller HostFuncCaller, statedb api.StateDB) api.EVM {
 	return &ProxyEVM{
 		Proxy: Proxy{memory: memory, allocator: allocator, caller: evmCaller},
 		db:    statedb,
@@ -365,15 +365,16 @@ var _ api.EVM = (*ProxyEVM)(nil)
 
 type CachedProxyEVM struct {
 	ProxyEVM
-	db          *CachedProxyStateDB
 	block       *bridge.BlockData
 	blockHashes map[uint64]common.Hash
 }
 
-func NewCachedProxyEVM(memory bridge.Memory, allocator bridge.Allocator, evmCaller HostFuncCaller, stateDBCaller HostFuncCaller) *CachedProxyEVM {
+func NewCachedProxyEVM(memory bridge.Memory, allocator bridge.Allocator, evmCaller HostFuncCaller, stateDBCaller HostFuncCaller) api.EVM {
 	return &CachedProxyEVM{
-		ProxyEVM: ProxyEVM{Proxy: Proxy{memory: memory, allocator: allocator, caller: evmCaller}},
-		db:       NewCachedProxyStateDB(memory, allocator, stateDBCaller),
+		ProxyEVM: ProxyEVM{
+			Proxy: Proxy{memory: memory, allocator: allocator, caller: evmCaller},
+			db:    NewCachedProxyStateDB(memory, allocator, stateDBCaller),
+		},
 	}
 }
 
@@ -425,8 +426,4 @@ func (p *CachedProxyEVM) BlockGasLimit() *big.Int {
 func (p *CachedProxyEVM) BlockCoinbase() common.Address {
 	p.getBlock()
 	return p.block.Coinbase
-}
-
-func (p *CachedProxyEVM) Commit() {
-	p.db.Commit()
 }

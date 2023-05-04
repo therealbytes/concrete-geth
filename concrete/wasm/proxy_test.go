@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewStateDBHostFunc(mem bridge.Memory, db cc_api.StateDB) wasm.HostFuncCaller {
+func newStateDBHostFunc(mem bridge.Memory, db cc_api.StateDB) wasm.HostFuncCaller {
 	return func(pointer uint64) uint64 {
 		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
@@ -42,7 +42,7 @@ func NewStateDBHostFunc(mem bridge.Memory, db cc_api.StateDB) wasm.HostFuncCalle
 func newProxyStateDB(db cc_api.StateDB) cc_api.StateDB {
 	mem := newMockMemory()
 	alloc := newMockAllocator()
-	caller := NewStateDBHostFunc(mem, db)
+	caller := newStateDBHostFunc(mem, db)
 	return wasm.NewProxyStateDB(mem, alloc, caller)
 }
 
@@ -50,7 +50,7 @@ type readWriteStorage struct {
 	read, write cc_api.Storage
 }
 
-func NewReadWriteStorage(read, write cc_api.Storage) cc_api.Storage {
+func newReadWriteStorage(read, write cc_api.Storage) cc_api.Storage {
 	return &readWriteStorage{
 		read:  read,
 		write: write,
@@ -88,7 +88,7 @@ func (s *readWriteStorage) GetPreimageSize(hash common.Hash) int {
 func TestStateDBBProxy(t *testing.T) {
 	var (
 		address       = common.HexToAddress("0x01")
-		statedb       = NewTestStateDB()
+		statedb       = newTestStateDB()
 		proxy         = newProxyStateDB(statedb)
 		stateApi      = cc_api.NewStateAPI(statedb, address)
 		proxyStateApi = cc_api.NewStateAPI(proxy, address)
@@ -100,12 +100,12 @@ func TestStateDBBProxy(t *testing.T) {
 	)
 
 	// Test persistent methods
-	cc_api_test.TestStorage(t, NewReadWriteStorage(persistent, proxyPersistent))
-	cc_api_test.TestStorage(t, NewReadWriteStorage(proxyPersistent, persistent))
+	cc_api_test.TestStorage(t, newReadWriteStorage(persistent, proxyPersistent))
+	cc_api_test.TestStorage(t, newReadWriteStorage(proxyPersistent, persistent))
 
 	// Test ephemeral methods
-	cc_api_test.TestStorage(t, NewReadWriteStorage(ephemeral, proxyEphemeral))
-	cc_api_test.TestStorage(t, NewReadWriteStorage(proxyEphemeral, ephemeral))
+	cc_api_test.TestStorage(t, newReadWriteStorage(ephemeral, proxyEphemeral))
+	cc_api_test.TestStorage(t, newReadWriteStorage(proxyEphemeral, ephemeral))
 
 	// Fuzz proxy
 	cc_api_test.FuzzStorage(t, proxyPersistent)
@@ -132,7 +132,7 @@ func (m *mockEVM) BlockCoinbase() common.Address        { return common.Address{
 
 var _ cc_api.EVM = &mockEVM{}
 
-func NewEVMHostFunc(mem bridge.Memory, evm cc_api.EVM) wasm.HostFuncCaller {
+func newEVMHostFunc(mem bridge.Memory, evm cc_api.EVM) wasm.HostFuncCaller {
 	return func(pointer uint64) uint64 {
 		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
@@ -146,8 +146,8 @@ func NewEVMHostFunc(mem bridge.Memory, evm cc_api.EVM) wasm.HostFuncCaller {
 func newProxyEVM(evm cc_api.EVM) cc_api.EVM {
 	mem := newMockMemory()
 	alloc := newMockAllocator()
-	stateDBCaller := NewStateDBHostFunc(mem, evm.StateDB())
-	evmCaller := NewEVMHostFunc(mem, evm)
+	stateDBCaller := newStateDBHostFunc(mem, evm.StateDB())
+	evmCaller := newEVMHostFunc(mem, evm)
 	return wasm.NewProxyEVM(mem, alloc, evmCaller, stateDBCaller)
 }
 

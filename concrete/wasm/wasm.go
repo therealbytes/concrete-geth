@@ -99,8 +99,8 @@ func newModule(config *hostConfig, code []byte) (wz_api.Module, wazero.Runtime, 
 }
 
 type wasmPrecompile struct {
-	r                 wazero.Runtime
-	mod               wz_api.Module
+	runtime           wazero.Runtime
+	module            wz_api.Module
 	mutex             sync.Mutex
 	memory            bridge.Memory
 	allocator         bridge.Allocator
@@ -127,8 +127,8 @@ func newWasmPrecompile(code []byte, address common.Address) *wasmPrecompile {
 		panic(err)
 	}
 
-	pc.r = r
-	pc.mod = mod
+	pc.runtime = r
+	pc.module = mod
 	pc.memory, pc.allocator = host.NewMemory(context.Background(), mod)
 
 	pc.expIsPure = mod.ExportedFunction(WASM_IS_PURE)
@@ -143,7 +143,7 @@ func newWasmPrecompile(code []byte, address common.Address) *wasmPrecompile {
 
 func (p *wasmPrecompile) close() {
 	ctx := context.Background()
-	p.r.Close(ctx)
+	p.runtime.Close(ctx)
 }
 
 func (p *wasmPrecompile) call__Uint64(expFunc wz_api.Function) uint64 {

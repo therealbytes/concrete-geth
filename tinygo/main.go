@@ -20,7 +20,7 @@ import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
-	"github.com/ethereum/go-ethereum/tinygo/mem"
+	"github.com/ethereum/go-ethereum/tinygo/infra"
 )
 
 var precompile cc_api.Precompile
@@ -75,7 +75,7 @@ func stateDBCaller(pointer uint64) uint64 {
 func _addressCaller(pointer uint64) uint64
 
 func addressCaller() common.Address {
-	address := wasm.Call_BytesArr_Bytes(mem.Memory, mem.Allocator, func(pointer uint64) uint64 { return _addressCaller(pointer) }, nil)
+	address := wasm.Call_BytesArr_Bytes(infra.Memory, infra.Allocator, func(pointer uint64) uint64 { return _addressCaller(pointer) }, nil)
 	return common.BytesToAddress(address)
 }
 
@@ -89,11 +89,11 @@ func getAddress() common.Address {
 func newAPI() cc_api.API {
 	var statedb cc_api.StateDB
 	if precompileConfig.cacheProxies() {
-		statedb = wasm.NewCachedProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
+		statedb = wasm.NewCachedProxyStateDB(infra.Memory, infra.Allocator, stateDBCaller)
 	} else {
-		statedb = wasm.NewProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
+		statedb = wasm.NewProxyStateDB(infra.Memory, infra.Allocator, stateDBCaller)
 	}
-	evm := wasm.NewProxyEVMWithStateDB(mem.Memory, mem.Allocator, evmCaller, statedb)
+	evm := wasm.NewProxyEVMWithStateDB(infra.Memory, infra.Allocator, evmCaller, statedb)
 	address := getAddress()
 	return cc_api.New(evm, address)
 }
@@ -101,9 +101,9 @@ func newAPI() cc_api.API {
 func newCommitSafeStateAPI() cc_api.API {
 	var statedb cc_api.StateDB
 	if precompileConfig.cacheProxies() {
-		statedb = wasm.NewCachedProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
+		statedb = wasm.NewCachedProxyStateDB(infra.Memory, infra.Allocator, stateDBCaller)
 	} else {
-		statedb = wasm.NewProxyStateDB(mem.Memory, mem.Allocator, stateDBCaller)
+		statedb = wasm.NewProxyStateDB(infra.Memory, infra.Allocator, stateDBCaller)
 	}
 	address := getAddress()
 	return cc_api.NewStateAPI(cc_api.NewCommitSafeStateDB(statedb), address)
@@ -130,7 +130,7 @@ func isPure() uint64 {
 
 //export concrete_MutatesStorage
 func mutatesStorage(pointer uint64) uint64 {
-	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
+	input := bridge.GetValue(infra.Memory, bridge.MemPointer(pointer))
 	if precompile.MutatesStorage(input) {
 		return 1
 	} else {
@@ -140,7 +140,7 @@ func mutatesStorage(pointer uint64) uint64 {
 
 //export concrete_RequiredGas
 func requiredGas(pointer uint64) uint64 {
-	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
+	input := bridge.GetValue(infra.Memory, bridge.MemPointer(pointer))
 	gas := precompile.RequiredGas(input)
 	return uint64(gas)
 }
@@ -163,9 +163,9 @@ func commit() uint64 {
 
 //export concrete_Run
 func run(pointer uint64) uint64 {
-	input := bridge.GetValue(mem.Memory, bridge.MemPointer(pointer))
+	input := bridge.GetValue(infra.Memory, bridge.MemPointer(pointer))
 	api := newAPI()
 	output, err := precompile.Run(api, input)
 	commitProxyCache(api)
-	return bridge.PutReturnWithError(mem.Memory, [][]byte{output}, err).Uint64()
+	return bridge.PutReturnWithError(infra.Memory, [][]byte{output}, err).Uint64()
 }

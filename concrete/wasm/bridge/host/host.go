@@ -42,14 +42,14 @@ var (
 
 type allocator struct {
 	ctx       context.Context
-	mod       wz_api.Module
+	module    wz_api.Module
 	expMalloc wz_api.Function
 	expFree   wz_api.Function
 	expPrune  wz_api.Function
 }
 
-func NewAllocator(ctx context.Context, mod wz_api.Module) bridge.Allocator {
-	return &allocator{ctx: ctx, mod: mod}
+func NewAllocator(ctx context.Context, module wz_api.Module) bridge.Allocator {
+	return &allocator{ctx: ctx, module: module}
 }
 
 func (a *allocator) Malloc(size uint32) bridge.MemPointer {
@@ -57,7 +57,7 @@ func (a *allocator) Malloc(size uint32) bridge.MemPointer {
 		return bridge.NullPointer
 	}
 	if a.expMalloc == nil {
-		a.expMalloc = a.mod.ExportedFunction(WASM_MALLOC)
+		a.expMalloc = a.module.ExportedFunction(WASM_MALLOC)
 	}
 	_offset, err := a.expMalloc.Call(a.ctx, uint64(size))
 	if err != nil {
@@ -73,7 +73,7 @@ func (a *allocator) Free(pointer bridge.MemPointer) {
 		return
 	}
 	if a.expFree == nil {
-		a.expFree = a.mod.ExportedFunction(WASM_FREE)
+		a.expFree = a.module.ExportedFunction(WASM_FREE)
 	}
 	_, err := a.expFree.Call(a.ctx, uint64(pointer.Offset()))
 	if err != nil {
@@ -83,7 +83,7 @@ func (a *allocator) Free(pointer bridge.MemPointer) {
 
 func (a *allocator) Prune() {
 	if a.expPrune == nil {
-		a.expPrune = a.mod.ExportedFunction(WASM_PRUNE)
+		a.expPrune = a.module.ExportedFunction(WASM_PRUNE)
 	}
 	_, err := a.expPrune.Call(a.ctx)
 	if err != nil {
@@ -95,8 +95,8 @@ type memory struct {
 	allocator
 }
 
-func NewMemory(ctx context.Context, mod wz_api.Module) (bridge.Memory, bridge.Allocator) {
-	alloc := &allocator{ctx: ctx, mod: mod}
+func NewMemory(ctx context.Context, module wz_api.Module) (bridge.Memory, bridge.Allocator) {
+	alloc := &allocator{ctx: ctx, module: module}
 	return &memory{allocator: *alloc}, alloc
 }
 
@@ -109,7 +109,7 @@ func (m *memory) Write(data []byte) bridge.MemPointer {
 		return bridge.NullPointer
 	}
 	pointer := m.Malloc(uint32(len(data)))
-	ok := m.mod.Memory().Write(pointer.Offset(), data)
+	ok := m.module.Memory().Write(pointer.Offset(), data)
 	if !ok {
 		panic(ErrMemoryReadOutOfRange)
 	}
@@ -120,7 +120,7 @@ func (m *memory) Read(pointer bridge.MemPointer) []byte {
 	if pointer.IsNull() {
 		return []byte{}
 	}
-	output, ok := m.mod.Memory().Read(pointer.Offset(), pointer.Size())
+	output, ok := m.module.Memory().Read(pointer.Offset(), pointer.Size())
 	if !ok {
 		panic(ErrMemoryReadOutOfRange)
 	}

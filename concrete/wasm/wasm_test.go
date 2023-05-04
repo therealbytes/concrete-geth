@@ -52,8 +52,8 @@ func TestStatefulPrecompile(t *testing.T) {
 	for ii := 0; ii < routines; ii++ {
 		go func(ii int) {
 			defer wg.Done()
-			statedb := NewTestStateDB()
-			evm := NewTestEVM(statedb)
+			statedb := newTestStateDB()
+			evm := newTestEVM(statedb)
 			api := cc_api.New(evm, address)
 			counter := lib.NewCounter(api.Persistent().NewReference(runCounterKey))
 			require.Equal(t, uint64(0), counter.Get().Uint64())
@@ -71,8 +71,8 @@ func TestStatefulPrecompile(t *testing.T) {
 }
 
 func newBenchmarkAPI(address common.Address) cc_api.API {
-	statedb := NewTestStateDB()
-	evm := NewTestEVM(statedb)
+	statedb := newTestStateDB()
+	evm := newTestEVM(statedb)
 	api := cc_api.New(evm, address)
 	return api
 }

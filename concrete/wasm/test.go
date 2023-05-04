@@ -24,11 +24,11 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-func NewTestStateDB() vm.StateDB {
+func newTestStateDB() vm.StateDB {
 	db, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	return db
 }
 
-func NewTestEVM(db vm.StateDB) api.EVM {
+func newTestEVM(db vm.StateDB) api.EVM {
 	return vm.NewEVM(vm.BlockContext{}, vm.TxContext{}, db, params.TestChainConfig, vm.Config{}).NewConcreteEVM()
 }

@@ -24,7 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/crypto"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
-	"github.com/ethereum/go-ethereum/tinygo/mem"
+	"github.com/ethereum/go-ethereum/tinygo/infra"
 )
 
 //go:wasm-module env
@@ -36,13 +36,13 @@ var logCaller = func(pointer uint64) uint64 { return _logCaller(pointer) }
 func Log(a ...any) {
 	msg := []byte(fmt.Sprintln(a...))
 	data := msg[:len(msg)-1]
-	wasm.Call_BytesArr_Bytes(mem.Memory, mem.Allocator, logCaller, []byte{bridge.Op_Log_Log}, data)
+	wasm.Call_BytesArr_Bytes(infra.Memory, infra.Allocator, logCaller, []byte{bridge.Op_Log_Log}, data)
 }
 
 func Print(a ...any) {
 	msg := []byte(fmt.Sprintln(a...))
 	data := msg[:len(msg)-1]
-	wasm.Call_BytesArr_Bytes(mem.Memory, mem.Allocator, logCaller, []byte{bridge.Op_Log_Print}, data)
+	wasm.Call_BytesArr_Bytes(infra.Memory, infra.Allocator, logCaller, []byte{bridge.Op_Log_Print}, data)
 }
 
 //go:wasm-module env
