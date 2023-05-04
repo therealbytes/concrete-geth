@@ -76,7 +76,10 @@ func newHostConfig() *hostConfig {
 
 func newModule(config *hostConfig, code []byte) (wz_api.Module, wazero.Runtime, error) {
 	ctx := context.Background()
-	r := wazero.NewRuntime(ctx)
+	runtimeConfig := wazero.NewRuntimeConfigCompiler().
+		WithMemoryCapacityFromMax(true).
+		WithMemoryLimitPages(64)
+	r := wazero.NewRuntimeWithConfig(ctx, runtimeConfig)
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(config.evm).Export(WASM_EVM_CALLER).
 		NewFunctionBuilder().WithFunc(config.statedb).Export(WASM_STATEDB_CALLER).
