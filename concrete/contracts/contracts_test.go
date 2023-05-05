@@ -16,7 +16,6 @@
 package contracts
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,10 +26,11 @@ import (
 )
 
 func TestAddPrecompile(t *testing.T) {
+	n := 10
 	pcs := ActivePrecompiles()
 	require.Empty(t, pcs, "Expected no precompiles")
 
-	for i := byte(0); i < 10; i++ {
+	for i := byte(0); i < byte(n); i++ {
 		addr := common.BytesToAddress([]byte{i})
 		err := AddPrecompile(addr, &lib.BlankPrecompile{})
 		require.NoError(t, err, "AddPrecompile should not return an error")
@@ -41,7 +41,7 @@ func TestAddPrecompile(t *testing.T) {
 	}
 
 	pcs = ActivePrecompiles()
-	require.Len(t, pcs, 10, "Expected 10 precompiles")
+	require.Len(t, pcs, n, "Expected %d precompiles", n)
 }
 
 var (
@@ -62,14 +62,7 @@ func (p *testPrecompile) MutatesStorage(input []byte) bool {
 }
 
 func (p *testPrecompile) Run(api cc_api.API, input []byte) (output []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic occurred: %v", r)
-		}
-	}()
-
 	api.StateDB().SetPersistentState(api.Address(), common.BytesToHash([]byte{1}), common.BytesToHash([]byte{1}))
-
 	return nil, nil
 }
 
@@ -87,9 +80,11 @@ func TestRunPrecompile(t *testing.T) {
 	suppliedGas := uint64(0)
 	readOnly := false
 
+	// Test invalid supplied gas
 	_, _, err := RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
 	require.Error(t, err, "Expected error")
 
+	// Test successful run and gas consumption
 	for ii := uint64(1); ii < 3; ii++ {
 		suppliedGas = ii * REQUIRED_GAS
 		_, remainingGas, err := RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
@@ -98,17 +93,16 @@ func TestRunPrecompile(t *testing.T) {
 	}
 
 	suppliedGas = REQUIRED_GAS
-
-	_, _, err = RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-	require.NoError(t, err, "Error should be nil")
-
 	readOnly = true
 
+	// Test read-only error when precompile mutates storage
 	_, _, err = RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
 	require.Error(t, err, "Expected error")
 
 	MUTATES_STORAGE = false
 
-	_, _, err = RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-	require.Error(t, err, "Expected error")
+	// Test panic when non-mutating precompile attempts to mutates storage
+	require.Panics(t, func() {
+		_, _, _ = RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
+	}, "Expected panic")
 }
