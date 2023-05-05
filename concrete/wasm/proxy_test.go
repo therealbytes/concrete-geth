@@ -28,22 +28,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newStateDBHostFunc(mem bridge.Memory, db cc_api.StateDB) wasm.HostFuncCaller {
+func newStateDBHostFunc(memory bridge.Memory, db cc_api.StateDB) wasm.HostFuncCaller {
 	return func(pointer uint64) uint64 {
-		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
+		args := bridge.GetArgs(memory, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
 		opcode.Decode(args[0])
 		args = args[1:]
 		out := host.CallStateDB(db, opcode, args)
-		return bridge.PutValue(mem, out).Uint64()
+		return bridge.PutValue(memory, out).Uint64()
 	}
 }
 
 func newProxyStateDB(db cc_api.StateDB) cc_api.StateDB {
-	mem := newMockMemory()
+	memory := newMockMemory()
 	alloc := newMockAllocator()
-	caller := newStateDBHostFunc(mem, db)
-	return wasm.NewProxyStateDB(mem, alloc, caller)
+	caller := newStateDBHostFunc(memory, db)
+	return wasm.NewProxyStateDB(memory, alloc, caller)
 }
 
 type readWriteStorage struct {
@@ -132,23 +132,23 @@ func (m *mockEVM) BlockCoinbase() common.Address        { return common.Address{
 
 var _ cc_api.EVM = &mockEVM{}
 
-func newEVMHostFunc(mem bridge.Memory, evm cc_api.EVM) wasm.HostFuncCaller {
+func newEVMHostFunc(memory bridge.Memory, evm cc_api.EVM) wasm.HostFuncCaller {
 	return func(pointer uint64) uint64 {
-		args := bridge.GetArgs(mem, bridge.MemPointer(pointer))
+		args := bridge.GetArgs(memory, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
 		opcode.Decode(args[0])
 		args = args[1:]
 		out := host.CallEVM(evm, opcode, args)
-		return bridge.PutValue(mem, out).Uint64()
+		return bridge.PutValue(memory, out).Uint64()
 	}
 }
 
 func newProxyEVM(evm cc_api.EVM) cc_api.EVM {
-	mem := newMockMemory()
+	memory := newMockMemory()
 	alloc := newMockAllocator()
-	stateDBCaller := newStateDBHostFunc(mem, evm.StateDB())
-	evmCaller := newEVMHostFunc(mem, evm)
-	return wasm.NewProxyEVM(mem, alloc, evmCaller, stateDBCaller)
+	stateDBCaller := newStateDBHostFunc(memory, evm.StateDB())
+	evmCaller := newEVMHostFunc(memory, evm)
+	return wasm.NewProxyEVM(memory, alloc, evmCaller, stateDBCaller)
 }
 
 func TestEVMProxy(t *testing.T) {

@@ -32,24 +32,24 @@ func newMockMemory() bridge.Memory {
 	return &mockMemory{}
 }
 
-func (mem *mockMemory) Read(pointer bridge.MemPointer) []byte {
+func (memory *mockMemory) Read(pointer bridge.MemPointer) []byte {
 	if pointer.IsNull() {
 		return []byte{}
 	}
 	offset, size := pointer.Unpack()
-	if offset+size > uint32(len(*mem)) {
+	if offset+size > uint32(len(*memory)) {
 		panic("out of memory")
 	}
-	return (*mem)[offset : offset+size]
+	return (*memory)[offset : offset+size]
 }
 
-func (mem *mockMemory) Write(data []byte) bridge.MemPointer {
+func (memory *mockMemory) Write(data []byte) bridge.MemPointer {
 	size := len(data)
 	if size == 0 {
 		return bridge.NullPointer
 	}
-	offset := len(*mem)
-	*mem = append(*mem, data...)
+	offset := len(*memory)
+	*memory = append(*memory, data...)
 	var pointer bridge.MemPointer
 	pointer.Pack(uint32(offset), uint32(size))
 	return pointer
@@ -67,111 +67,111 @@ func (a *mockAllocator) Malloc(size uint32) bridge.MemPointer { return bridge.Nu
 func (a *mockAllocator) Free(pointer bridge.MemPointer)       {}
 func (a *mockAllocator) Prune()                               {}
 
-func testMemoryReadWrite(t *testing.T, mem bridge.Memory) {
+func testMemoryReadWrite(t *testing.T, memory bridge.Memory) {
 	data := []byte{1, 2, 3, 4, 5}
-	ptr := mem.Write(data)
+	ptr := memory.Write(data)
 	require.False(t, ptr.IsNull())
-	readData := mem.Read(ptr)
+	readData := memory.Read(ptr)
 	require.Equal(t, data, readData)
 }
 
-func testMemoryPutGetValues(t *testing.T, mem bridge.Memory) {
+func testMemoryPutGetValues(t *testing.T, memory bridge.Memory) {
 	// Test PutValue and GetValue
 	value := []byte{0x01, 0x02, 0x03}
-	pointer := bridge.PutValue(mem, value)
+	pointer := bridge.PutValue(memory, value)
 	require.NotEqual(t, bridge.NullPointer, pointer)
-	result := bridge.GetValue(mem, pointer)
+	result := bridge.GetValue(memory, pointer)
 	require.Equal(t, value, result)
 
 	// Test PutValues and GetValues
 	values := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
-	pointer = bridge.PutValues(mem, values)
+	pointer = bridge.PutValues(memory, values)
 	require.NotEqual(t, bridge.NullPointer, pointer)
-	resultValues := bridge.GetValues(mem, pointer)
+	resultValues := bridge.GetValues(memory, pointer)
 	require.Equal(t, values, resultValues)
 
 	// Test PutValues with empty slice
-	pointer = bridge.PutValues(mem, [][]byte{})
+	pointer = bridge.PutValues(memory, [][]byte{})
 	require.Equal(t, bridge.NullPointer, pointer)
 
 	// Test GetValues with null pointer
-	resultValues = bridge.GetValues(mem, bridge.NullPointer)
+	resultValues = bridge.GetValues(memory, bridge.NullPointer)
 	require.Equal(t, [][]byte{}, resultValues)
 }
 
-func testMemoryPutGetArgs(t *testing.T, mem bridge.Memory) {
+func testMemoryPutGetArgs(t *testing.T, memory bridge.Memory) {
 	// Test PutArgs and GetArgs
 	args := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
-	pointer := bridge.PutArgs(mem, args)
+	pointer := bridge.PutArgs(memory, args)
 	require.NotEqual(t, bridge.NullPointer, pointer)
-	resultArgs := bridge.GetArgs(mem, pointer)
+	resultArgs := bridge.GetArgs(memory, pointer)
 	require.Equal(t, args, resultArgs)
 
 	// Test PutArgs with empty slice
-	pointer = bridge.PutArgs(mem, [][]byte{})
+	pointer = bridge.PutArgs(memory, [][]byte{})
 	require.Equal(t, bridge.NullPointer, pointer)
 
 	// Test GetArgs with null pointer
-	resultArgs = bridge.GetArgs(mem, bridge.NullPointer)
+	resultArgs = bridge.GetArgs(memory, bridge.NullPointer)
 	require.Equal(t, [][]byte{}, resultArgs)
 }
 
-func testMemoryPutGetReturn(t *testing.T, mem bridge.Memory) {
+func testMemoryPutGetReturn(t *testing.T, memory bridge.Memory) {
 	// Test PutReturn and GetReturn
 	retValues := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
-	pointer := bridge.PutReturn(mem, retValues)
+	pointer := bridge.PutReturn(memory, retValues)
 	require.NotEqual(t, bridge.NullPointer, pointer)
-	resultRetValues := bridge.GetReturn(mem, pointer)
+	resultRetValues := bridge.GetReturn(memory, pointer)
 	require.Equal(t, retValues, resultRetValues)
 
 	// Test PutReturn with empty slice
-	pointer = bridge.PutReturn(mem, [][]byte{})
+	pointer = bridge.PutReturn(memory, [][]byte{})
 	require.Equal(t, bridge.NullPointer, pointer)
 
 	// Test GetReturn with null pointer
-	resultRetValues = bridge.GetReturn(mem, bridge.NullPointer)
+	resultRetValues = bridge.GetReturn(memory, bridge.NullPointer)
 	require.Equal(t, [][]byte{}, resultRetValues)
 }
 
-func testMemoryPutGetReturnWithError(t *testing.T, mem bridge.Memory) {
+func testMemoryPutGetReturnWithError(t *testing.T, memory bridge.Memory) {
 	// Test with success
 	retValues := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
-	retPointer := bridge.PutReturnWithError(mem, retValues, nil)
-	retValuesGot, err := bridge.GetReturnWithError(mem, retPointer)
+	retPointer := bridge.PutReturnWithError(memory, retValues, nil)
+	retValuesGot, err := bridge.GetReturnWithError(memory, retPointer)
 	require.NoError(t, err)
 	require.Equal(t, retValues, retValuesGot)
 
 	// Test with error
 	retErr := errors.New("some error")
-	retPointer = bridge.PutReturnWithError(mem, retValues, retErr)
-	retValuesGot, err = bridge.GetReturnWithError(mem, retPointer)
+	retPointer = bridge.PutReturnWithError(memory, retValues, retErr)
+	retValuesGot, err = bridge.GetReturnWithError(memory, retPointer)
 	require.EqualError(t, err, retErr.Error())
 	require.Equal(t, retValues, retValuesGot)
 }
 
 func TestMockMemoryReadWrite(t *testing.T) {
-	mem := newMockMemory()
-	testMemoryReadWrite(t, mem)
+	memory := newMockMemory()
+	testMemoryReadWrite(t, memory)
 }
 
 func TestPutGetValues(t *testing.T) {
-	mem := newMockMemory()
-	testMemoryPutGetValues(t, mem)
+	memory := newMockMemory()
+	testMemoryPutGetValues(t, memory)
 }
 
 func TestPutGetArgs(t *testing.T) {
-	mem := newMockMemory()
-	testMemoryPutGetArgs(t, mem)
+	memory := newMockMemory()
+	testMemoryPutGetArgs(t, memory)
 }
 
 func TestPutGetReturn(t *testing.T) {
-	mem := newMockMemory()
-	testMemoryPutGetReturn(t, mem)
+	memory := newMockMemory()
+	testMemoryPutGetReturn(t, memory)
 }
 
 func TestPutGetReturnWithError(t *testing.T) {
-	mem := newMockMemory()
-	testMemoryPutGetReturnWithError(t, mem)
+	memory := newMockMemory()
+	testMemoryPutGetReturnWithError(t, memory)
 }
 
 //go:embed bin/blank.wasm
@@ -188,44 +188,44 @@ func newTestMemory() (bridge.Memory, bridge.Allocator) {
 }
 
 func TestWasmMemoryReadWrite(t *testing.T) {
-	mem, _ := newTestMemory()
-	testMemoryReadWrite(t, mem)
+	memory, _ := newTestMemory()
+	testMemoryReadWrite(t, memory)
 }
 
 func TestWasmMemoryFree(t *testing.T) {
-	mem, alloc := newTestMemory()
+	memory, alloc := newTestMemory()
 	data := []byte{1, 2, 3, 4, 5}
-	ptr := mem.Write(data)
+	ptr := memory.Write(data)
 	alloc.Free(ptr)
 	require.Panics(t, func() { alloc.Free(ptr) })
 }
 
 func TestWasmMemoryPrune(t *testing.T) {
-	mem, alloc := newTestMemory()
+	memory, alloc := newTestMemory()
 	data := []byte{1, 2, 3, 4, 5}
-	ptr1 := mem.Write(data)
-	ptr2 := mem.Write(data)
+	ptr1 := memory.Write(data)
+	ptr2 := memory.Write(data)
 	alloc.Prune()
 	require.Panics(t, func() { alloc.Free(ptr1) })
 	require.Panics(t, func() { alloc.Free(ptr2) })
 }
 
 func TestWasmMemoryPutGetValues(t *testing.T) {
-	mem, _ := newTestMemory()
-	testMemoryPutGetValues(t, mem)
+	memory, _ := newTestMemory()
+	testMemoryPutGetValues(t, memory)
 }
 
 func TestWasmMemoryPutGetArgs(t *testing.T) {
-	mem, _ := newTestMemory()
-	testMemoryPutGetArgs(t, mem)
+	memory, _ := newTestMemory()
+	testMemoryPutGetArgs(t, memory)
 }
 
 func TestWasmMemoryPutGetReturn(t *testing.T) {
-	mem, _ := newTestMemory()
-	testMemoryPutGetReturn(t, mem)
+	memory, _ := newTestMemory()
+	testMemoryPutGetReturn(t, memory)
 }
 
 func TestWasmMemoryPutGetReturnWithError(t *testing.T) {
-	mem, _ := newTestMemory()
-	testMemoryPutGetReturnWithError(t, mem)
+	memory, _ := newTestMemory()
+	testMemoryPutGetReturnWithError(t, memory)
 }
