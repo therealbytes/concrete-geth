@@ -91,6 +91,7 @@ type BlockData struct {
 }
 
 func (block *BlockData) Encode() []byte {
+	// NOTE: Slots could be smaller than 32 bytes
 	data := make([]byte, 32*4+20)
 	block.Timestamp.FillBytes(data[:32])
 	block.Number.FillBytes(data[32:64])
