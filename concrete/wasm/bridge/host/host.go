@@ -183,11 +183,11 @@ func LogHostFunc(ctx context.Context, module wz_api.Module, pointer uint64) uint
 	mem, _ := NewMemory(ctx, module)
 	data := bridge.GetArgs(mem, bridge.MemPointer(pointer))
 	opcode := data[0][0]
-	msg := data[1]
+	msg := string(data[1])
 	if opcode == bridge.Op_Log_Log {
-		log.Debug("wasm:", string(msg))
+		log.Info(msg)
 	} else {
-		fmt.Println("wasm:", string(msg))
+		fmt.Println(msg)
 	}
 	return bridge.NullPointer.Uint64()
 }

@@ -19,17 +19,21 @@ package std
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 func Log(a ...any) {
-	fmt.Println(a...)
+	msg := strings.TrimSpace(fmt.Sprintln(a...))
+	log.Info(msg)
 }
 
 func Print(a ...any) {
-	fmt.Println(a...)
+	msg := strings.TrimSpace(fmt.Sprintln(a...))
+	fmt.Println(msg)
 }
 
 func Now() time.Time {

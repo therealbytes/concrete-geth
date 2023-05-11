@@ -34,14 +34,14 @@ func _logCaller(pointer uint64) uint64
 var logCaller = func(pointer uint64) uint64 { return _logCaller(pointer) }
 
 func Log(a ...any) {
-	msg := []byte(fmt.Sprintln(a...))
-	data := msg[:len(msg)-1]
+	msg := strings.TrimSpace(fmt.Sprintln(a...))
+	data := []byte(msg)
 	wasm.Call_BytesArr_Bytes(infra.Memory, infra.Allocator, logCaller, []byte{bridge.Op_Log_Log}, data)
 }
 
 func Print(a ...any) {
-	msg := []byte(fmt.Sprintln(a...))
-	data := msg[:len(msg)-1]
+	msg := strings.TrimSpace(fmt.Sprintln(a...))
+	data := []byte(msg)
 	wasm.Call_BytesArr_Bytes(infra.Memory, infra.Allocator, logCaller, []byte{bridge.Op_Log_Print}, data)
 }
 
