@@ -19,6 +19,7 @@ package std
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/concrete/crypto"
