@@ -73,7 +73,6 @@ func TestPrecompile(t *testing.T) {
 				gspec = &core.Genesis{
 					Config: params.TestChainConfig,
 					Alloc: core.GenesisAlloc{
-						impl.address:  {Balance: common.Big1},
 						senderAddress: {Balance: big.NewInt(1000000000000000)},
 					},
 				}

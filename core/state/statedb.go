@@ -1084,7 +1084,8 @@ func (s *StateDB) Finalise(deleteEmptyObjects bool) {
 			// Thus, we can safely ignore it here
 			continue
 		}
-		if obj.suicided || (deleteEmptyObjects && obj.empty()) {
+		_, isConcretePrecompile := cc_contracts.GetPrecompile(addr)
+		if obj.suicided || (deleteEmptyObjects && obj.empty() && !isConcretePrecompile) {
 			obj.deleted = true
 
 			// We need to maintain account deletions explicitly (will remain
