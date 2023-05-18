@@ -16,14 +16,14 @@
 package main
 
 import (
-	"github.com/ethereum/go-ethereum/concrete/lib"
+	"github.com/ethereum/go-ethereum/concrete/lib/precompiles"
 	"github.com/ethereum/go-ethereum/tinygo"
 )
 
 func init() {
 	config := tinygo.DefaultConfig
 	config.CacheProxies = true
-	tinygo.WasmWrapWithConfig(&lib.TypicalPrecompile{}, config)
+	tinygo.WasmWrapWithConfig(&precompiles.TypicalPrecompile{}, config)
 }
 
 // main is REQUIRED for TinyGo to compile to Wasm

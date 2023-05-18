@@ -168,9 +168,10 @@ func NewEVMHostFunc(apiGetter func() cc_api.API) HostFunc {
 	}
 }
 
-func NewAddressHostFunc(address common.Address) HostFunc {
+func NewAddressHostFunc(apiGetter func() cc_api.API) HostFunc {
 	return func(ctx context.Context, module wz_api.Module, pointer uint64) uint64 {
 		mem, _ := NewMemory(ctx, module)
+		address := apiGetter().Address()
 		return bridge.PutValue(mem, address.Bytes()).Uint64()
 	}
 }

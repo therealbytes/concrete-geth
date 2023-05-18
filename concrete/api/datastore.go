@@ -362,3 +362,29 @@ func (s *set) Values() Array {
 }
 
 var _ Set = (*set)(nil)
+
+// Constructors for for testing.
+// Testing is done in a separate package as it may introduce dependencies
+// incompatible with tinygo.
+
+func NewPersistentStorage(db StateDB, address common.Address) *PersistentStorage {
+	return &PersistentStorage{
+		db:      db,
+		address: address,
+	}
+}
+
+func NewEphemeralStorage(db StateDB, address common.Address) *EphemeralStorage {
+	return &EphemeralStorage{
+		db:      db,
+		address: address,
+	}
+}
+
+func NewFullBlock(evm EVM) *FullBlock {
+	return &FullBlock{evm}
+}
+
+func NewCoreDatastore(storage Storage) *CoreDatastore {
+	return &CoreDatastore{storage}
+}

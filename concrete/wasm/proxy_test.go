@@ -157,12 +157,13 @@ func TestEVMProxy(t *testing.T) {
 		evm     = newEVMStub(statedb)
 		proxy   = newProxyEVM(evm)
 	)
-	require.Equal(t, evm.BlockHash(common.Big1), proxy.BlockHash(common.Big1))
-	require.Equal(t, evm.BlockTimestamp(), proxy.BlockTimestamp())
-	require.Equal(t, evm.BlockNumber(), proxy.BlockNumber())
-	require.Equal(t, evm.BlockDifficulty(), proxy.BlockDifficulty())
-	require.Equal(t, evm.BlockGasLimit(), proxy.BlockGasLimit())
-	require.Equal(t, evm.BlockCoinbase(), proxy.BlockCoinbase())
+	r := require.New(t)
+	r.Equal(evm.BlockHash(common.Big1), proxy.BlockHash(common.Big1))
+	r.Equal(evm.BlockTimestamp(), proxy.BlockTimestamp())
+	r.Equal(evm.BlockNumber(), proxy.BlockNumber())
+	r.Equal(evm.BlockDifficulty(), proxy.BlockDifficulty())
+	r.Equal(evm.BlockGasLimit(), proxy.BlockGasLimit())
+	r.Equal(evm.BlockCoinbase(), proxy.BlockCoinbase())
 }
 
 func TestBlockEncodeDecode(t *testing.T) {

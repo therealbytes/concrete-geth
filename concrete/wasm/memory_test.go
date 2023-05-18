@@ -68,85 +68,90 @@ func (a *mockAllocator) Free(pointer bridge.MemPointer)       {}
 func (a *mockAllocator) Prune()                               {}
 
 func testMemoryReadWrite(t *testing.T, memory bridge.Memory) {
+	r := require.New(t)
 	data := []byte{1, 2, 3, 4, 5}
 	ptr := memory.Write(data)
-	require.False(t, ptr.IsNull())
+	r.False(ptr.IsNull())
 	readData := memory.Read(ptr)
-	require.Equal(t, data, readData)
+	r.Equal(data, readData)
 }
 
 func testMemoryPutGetValues(t *testing.T, memory bridge.Memory) {
+	r := require.New(t)
 	// Test PutValue and GetValue
 	value := []byte{0x01, 0x02, 0x03}
 	pointer := bridge.PutValue(memory, value)
-	require.NotEqual(t, bridge.NullPointer, pointer)
+	r.NotEqual(bridge.NullPointer, pointer)
 	result := bridge.GetValue(memory, pointer)
-	require.Equal(t, value, result)
+	r.Equal(value, result)
 
 	// Test PutValues and GetValues
 	values := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
 	pointer = bridge.PutValues(memory, values)
-	require.NotEqual(t, bridge.NullPointer, pointer)
+	r.NotEqual(bridge.NullPointer, pointer)
 	resultValues := bridge.GetValues(memory, pointer)
-	require.Equal(t, values, resultValues)
+	r.Equal(values, resultValues)
 
 	// Test PutValues with empty slice
 	pointer = bridge.PutValues(memory, [][]byte{})
-	require.Equal(t, bridge.NullPointer, pointer)
+	r.Equal(bridge.NullPointer, pointer)
 
 	// Test GetValues with null pointer
 	resultValues = bridge.GetValues(memory, bridge.NullPointer)
-	require.Equal(t, [][]byte{}, resultValues)
+	r.Equal([][]byte{}, resultValues)
 }
 
 func testMemoryPutGetArgs(t *testing.T, memory bridge.Memory) {
+	r := require.New(t)
 	// Test PutArgs and GetArgs
 	args := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
 	pointer := bridge.PutArgs(memory, args)
-	require.NotEqual(t, bridge.NullPointer, pointer)
+	r.NotEqual(bridge.NullPointer, pointer)
 	resultArgs := bridge.GetArgs(memory, pointer)
-	require.Equal(t, args, resultArgs)
+	r.Equal(args, resultArgs)
 
 	// Test PutArgs with empty slice
 	pointer = bridge.PutArgs(memory, [][]byte{})
-	require.Equal(t, bridge.NullPointer, pointer)
+	r.Equal(bridge.NullPointer, pointer)
 
 	// Test GetArgs with null pointer
 	resultArgs = bridge.GetArgs(memory, bridge.NullPointer)
-	require.Equal(t, [][]byte{}, resultArgs)
+	r.Equal([][]byte{}, resultArgs)
 }
 
 func testMemoryPutGetReturn(t *testing.T, memory bridge.Memory) {
+	r := require.New(t)
 	// Test PutReturn and GetReturn
 	retValues := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
 	pointer := bridge.PutReturn(memory, retValues)
-	require.NotEqual(t, bridge.NullPointer, pointer)
+	r.NotEqual(bridge.NullPointer, pointer)
 	resultRetValues := bridge.GetReturn(memory, pointer)
-	require.Equal(t, retValues, resultRetValues)
+	r.Equal(retValues, resultRetValues)
 
 	// Test PutReturn with empty slice
 	pointer = bridge.PutReturn(memory, [][]byte{})
-	require.Equal(t, bridge.NullPointer, pointer)
+	r.Equal(bridge.NullPointer, pointer)
 
 	// Test GetReturn with null pointer
 	resultRetValues = bridge.GetReturn(memory, bridge.NullPointer)
-	require.Equal(t, [][]byte{}, resultRetValues)
+	r.Equal([][]byte{}, resultRetValues)
 }
 
 func testMemoryPutGetReturnWithError(t *testing.T, memory bridge.Memory) {
+	r := require.New(t)
 	// Test with success
 	retValues := [][]byte{{0x01, 0x02}, {0x03, 0x04}, {0x05, 0x06, 0x07}}
 	retPointer := bridge.PutReturnWithError(memory, retValues, nil)
 	retValuesGot, err := bridge.GetReturnWithError(memory, retPointer)
-	require.NoError(t, err)
-	require.Equal(t, retValues, retValuesGot)
+	r.NoError(err)
+	r.Equal(retValues, retValuesGot)
 
 	// Test with error
 	retErr := errors.New("some error")
 	retPointer = bridge.PutReturnWithError(memory, retValues, retErr)
 	retValuesGot, err = bridge.GetReturnWithError(memory, retPointer)
-	require.EqualError(t, err, retErr.Error())
-	require.Equal(t, retValues, retValuesGot)
+	r.EqualError(err, retErr.Error())
+	r.Equal(retValues, retValuesGot)
 }
 
 func TestMockMemoryReadWrite(t *testing.T) {

@@ -17,7 +17,6 @@ package wasm
 
 import (
 	_ "embed"
-	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -26,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/lib"
+	"github.com/ethereum/go-ethereum/concrete/lib/precompiles"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 )
@@ -36,85 +36,84 @@ var typicalCode []byte
 //go:embed bin/benchmark.wasm
 var benchmarkCode []byte
 
-func TestWasmPrecompile(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	pc := NewWasmPrecompile(typicalCode, address)
+var typicalImplementations = []struct {
+	name string
+	pc   cc_api.Precompile
+}{
+	{"Native", &precompiles.TypicalPrecompile{}},
+	{"Wasm", NewWasmPrecompile(typicalCode)},
+}
 
-	require.IsType(t, &wasmPrecompile{}, pc)
-
-	runCounterKey := crypto.Keccak256Hash([]byte("typical.counter.0"))
-
-	var wg sync.WaitGroup
-	routines := 50
-	iterations := 20
-	wg.Add(routines)
-
-	for ii := 0; ii < routines; ii++ {
-		go func(ii int) {
-			defer wg.Done()
-			statedb := newTestStateDB()
-			evm := newTestEVM(statedb)
-			api := cc_api.New(evm, address)
-			counter := lib.NewCounter(api.Persistent().NewReference(runCounterKey))
-			require.Equal(t, uint64(0), counter.Get().Uint64())
-			for jj := 0; jj < iterations; jj++ {
-				data := []byte{byte(ii), byte(jj)}
-				_, err := pc.Run(api, data)
-				require.NoError(t, err)
-				time.Sleep(time.Duration(rand.Intn(10)) * time.Microsecond)
+func TestPrecompile(t *testing.T) {
+	var (
+		r             = require.New(t)
+		runCounterKey = crypto.Keccak256Hash([]byte("typical.counter.0"))
+	)
+	for _, impl := range typicalImplementations {
+		t.Run(impl.name, func(t *testing.T) {
+			var wg sync.WaitGroup
+			routines := 50
+			iterations := 20
+			wg.Add(routines)
+			for ii := 0; ii < routines; ii++ {
+				go func(ii int) {
+					defer wg.Done()
+					var (
+						statedb = newTestStateDB()
+						evm     = newTestEVM(statedb)
+						api     = cc_api.New(evm, common.Address{})
+						counter = lib.NewCounter(api.Persistent().NewReference(runCounterKey))
+					)
+					r.Equal(uint64(0), counter.Get().Uint64())
+					for jj := 0; jj < iterations; jj++ {
+						_, err := impl.pc.Run(api, nil)
+						r.NoError(err)
+						time.Sleep(time.Duration(rand.Intn(10)) * time.Microsecond)
+					}
+					r.Equal(uint64(iterations), counter.Get().Uint64())
+				}(ii)
 			}
-			require.Equal(t, uint64(iterations), counter.Get().Uint64())
-		}(ii)
-	}
-
-	wg.Wait()
-}
-
-func newBenchmarkAPI(address common.Address) cc_api.API {
-	statedb := newTestStateDB()
-	evm := newTestEVM(statedb)
-	api := cc_api.New(evm, address)
-	return api
-}
-
-func BenchmarkNativeTypicalPrecompile(b *testing.B) {
-	address := common.HexToAddress("0x01")
-	api := newBenchmarkAPI(address)
-	pc := lib.TypicalPrecompile{}
-	preimage := crypto.Keccak256([]byte("hello world"))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		pc.Run(api, preimage)
+			wg.Wait()
+		})
 	}
 }
 
-func BenchmarkWasmTypicalPrecompile(b *testing.B) {
-	address := common.HexToAddress("0x01")
-	api := newBenchmarkAPI(address)
-	pc := NewWasmPrecompile(typicalCode, address)
-	preimage := crypto.Keccak256([]byte("hello world"))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		pc.Run(api, preimage)
+func BenchmarkPrecompile(b *testing.B) {
+	var (
+		statedb  = newTestStateDB()
+		evm      = newTestEVM(statedb)
+		api      = cc_api.New(evm, common.Address{})
+		preimage = crypto.Keccak256([]byte("test.data"))
+	)
+	for _, impl := range typicalImplementations {
+		b.Run(impl.name, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := impl.pc.Run(api, preimage)
+				require.NoError(b, err)
+			}
+		})
 	}
 }
 
-func TestNativeBenchmarkPrecompile(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	api := newBenchmarkAPI(address)
-	pc := lib.BenchmarkPrecompile{}
-	start := time.Now()
-	pc.Run(api, nil)
-	end := time.Now()
-	fmt.Println("[external] BenchmarkPrecompile.Run", end.Sub(start).Nanoseconds(), "ns")
+var benchmarkImplementations = []struct {
+	name string
+	pc   cc_api.Precompile
+}{
+	{"Native", &precompiles.BenchmarkPrecompile{}},
+	{"Wasm", NewWasmPrecompile(benchmarkCode)},
 }
 
-func TestWasmBenchmarkPrecompile(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	api := newBenchmarkAPI(address)
-	pc := NewWasmPrecompile(benchmarkCode, address)
-	start := time.Now()
-	pc.Run(api, nil)
-	end := time.Now()
-	fmt.Println("[external] BenchmarkPrecompile.Run", end.Sub(start).Nanoseconds(), "ns")
+func TestRunBenchmarkPrecompile(t *testing.T) {
+	var (
+		statedb = newTestStateDB()
+		evm     = newTestEVM(statedb)
+		api     = cc_api.New(evm, common.Address{})
+	)
+	for _, impl := range benchmarkImplementations {
+		t.Run(impl.name, func(t *testing.T) {
+			_, err := impl.pc.Run(api, nil)
+			require.NoError(t, err)
+		})
+	}
 }

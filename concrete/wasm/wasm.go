@@ -19,7 +19,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/host"
@@ -45,8 +44,8 @@ var (
 	WASM_TIME_CALLER      = "concrete_TimeCaller"
 )
 
-func NewWasmPrecompile(code []byte, address common.Address) cc_api.Precompile {
-	pc := newWasmPrecompile(code, address)
+func NewWasmPrecompile(code []byte) cc_api.Precompile {
+	pc := newWasmPrecompile(code)
 	if pc.isPure() {
 		return &statelessWasmPrecompile{pc}
 	}
@@ -113,14 +112,14 @@ type wasmPrecompile struct {
 	expRun            wz_api.Function
 }
 
-func newWasmPrecompile(code []byte, address common.Address) *wasmPrecompile {
+func newWasmPrecompile(code []byte) *wasmPrecompile {
 	pc := &wasmPrecompile{}
 
 	hostConfig := newHostConfig()
 	apiGetter := func() cc_api.API { return pc.api }
 	hostConfig.evm = host.NewEVMHostFunc(apiGetter)
 	hostConfig.statedb = host.NewStateDBHostFunc(apiGetter)
-	hostConfig.address = host.NewAddressHostFunc(address)
+	hostConfig.address = host.NewAddressHostFunc(apiGetter)
 
 	mod, r, err := newModule(hostConfig, code)
 	if err != nil {

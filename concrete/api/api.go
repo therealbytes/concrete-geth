@@ -348,6 +348,10 @@ type FullAPI struct {
 }
 
 func New(evm EVM, address common.Address) API {
+	return NewAPI(evm, address)
+}
+
+func NewAPI(evm EVM, address common.Address) API {
 	return &FullAPI{
 		StateAPI: StateAPI{address: address, db: evm.StateDB()},
 		evm:      evm,

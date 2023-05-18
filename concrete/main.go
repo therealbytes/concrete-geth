@@ -74,5 +74,5 @@ func (a *concreteGeth) AddPrecompileWasm(addr common.Address, code []byte) error
 	if err := a.validateNewPCAddress(addr); err != nil {
 		return err
 	}
-	return contracts.AddPrecompile(addr, wasm.NewWasmPrecompile(code, addr))
+	return contracts.AddPrecompile(addr, wasm.NewWasmPrecompile(code))
 }

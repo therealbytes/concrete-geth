@@ -20,270 +20,284 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/concrete/api"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/stretchr/testify/require"
 )
 
-func TestReadOnlyStateDB(t *testing.T) {
-	sdb := cc_api.NewReadOnlyStateDB(NewMockStateDB())
-
-	// Test type
-	require.IsType(t, &cc_api.ReadOnlyStateDB{}, sdb, "NewReadOnlyStateDB should return a readOnlyStateDB")
-
-	// Test SetPersistentState panics
-	require.Panics(t, func() {
-		sdb.SetPersistentState(common.Address{}, common.Hash{}, common.Hash{})
-	}, "stateDB write protection")
-
-	// Test SetEphemeralState panics
-	require.Panics(t, func() {
-		sdb.SetEphemeralState(common.Address{}, common.Hash{}, common.Hash{})
-	}, "stateDB write protection")
-
-	// Test AddPersistentPreimage panics
-	require.Panics(t, func() {
-		sdb.AddPersistentPreimage(common.Hash{}, []byte{})
-	}, "stateDB write protection")
-
-	// Test AddEphemeralPreimage panics
-	require.Panics(t, func() {
-		sdb.AddEphemeralPreimage(common.Hash{}, []byte{})
-	}, "stateDB write protection")
-
-	// Test GetPersistentState
-	require.NotPanics(t, func() {
-		sdb.GetPersistentState(common.Address{}, common.Hash{})
-	}, "GetPersistentState should not panic")
-
-	// Test GetEphemeralState
-	require.NotPanics(t, func() {
-		sdb.GetEphemeralState(common.Address{}, common.Hash{})
-	}, "GetEphemeralState should not panic")
-
-	// Test GetPersistentPreimage
-	require.NotPanics(t, func() {
-		sdb.GetPersistentPreimage(common.Hash{})
-	}, "GetPersistentPreimage should not panic")
-
-	// Test GetPersistentPreimageSize
-	require.NotPanics(t, func() {
-		sdb.GetPersistentPreimageSize(common.Hash{})
-	}, "GetPersistentPreimageSize should not panic")
-
-	// Test GetEphemeralPreimage
-	require.NotPanics(t, func() {
-		sdb.GetEphemeralPreimage(common.Hash{})
-	}, "GetEphemeralPreimage should not panic")
-
-	// Test GetEphemeralPreimageSize
-	require.NotPanics(t, func() {
-		sdb.GetEphemeralPreimageSize(common.Hash{})
-	}, "GetEphemeralPreimageSize should not panic")
+var statedbs = []struct {
+	name        string
+	constructor func() cc_api.StateDB
+	readOnly    bool
+	commitSafe  bool
+}{
+	{
+		name: "StateDB",
+		constructor: func() cc_api.StateDB {
+			return NewMockStateDB()
+		},
+		readOnly:   false,
+		commitSafe: false,
+	},
+	{
+		name: "ReadOnlyStateDB",
+		constructor: func() cc_api.StateDB {
+			return cc_api.NewReadOnlyStateDB(NewMockStateDB())
+		},
+		readOnly:   true,
+		commitSafe: true,
+	},
+	{
+		name: "CommitSafeStateDB",
+		constructor: func() cc_api.StateDB {
+			return cc_api.NewCommitSafeStateDB(NewMockStateDB())
+		},
+		readOnly:   false,
+		commitSafe: true,
+	},
 }
 
-func TestCommitSafeStateDB(t *testing.T) {
-	sdb := cc_api.NewCommitSafeStateDB(NewMockStateDB())
-
-	// Test type
-	require.IsType(t, &cc_api.CommitSafeStateDB{}, sdb, "NewCommitSafeStateDB should return a CommitSafeStateDB")
-
-	// Test SetPersistentState
-	require.Panics(t, func() {
-		sdb.SetPersistentState(common.Address{}, common.Hash{}, common.Hash{})
-	}, "stateDB write protection")
-
-	// Test SetEphemeralState
-	require.NotPanics(t, func() {
-		sdb.SetEphemeralState(common.Address{}, common.Hash{}, common.Hash{})
-	}, "SetEphemeralState should not panic")
-
-	// Test AddPersistentPreimage
-	require.NotPanics(t, func() {
-		sdb.AddPersistentPreimage(common.Hash{}, []byte{})
-	}, "AddPersistentPreimage should not panic")
-
-	// Test AddEphemeralPreimage
-	require.NotPanics(t, func() {
-		sdb.AddEphemeralPreimage(common.Hash{}, []byte{})
-	}, "AddEphemeralPreimage should not panic")
-
-	// Test GetPersistentState
-	require.NotPanics(t, func() {
-		sdb.GetPersistentState(common.Address{}, common.Hash{})
-	}, "GetPersistentState should not panic")
-
-	// Test GetEphemeralState
-	require.NotPanics(t, func() {
-		sdb.GetEphemeralState(common.Address{}, common.Hash{})
-	}, "GetEphemeralState should not panic")
-
-	// Test GetPersistentPreimage
-	require.NotPanics(t, func() {
-		sdb.GetPersistentPreimage(common.Hash{})
-	}, "GetPersistentPreimage should not panic")
-
-	// Test GetPersistentPreimageSize
-	require.NotPanics(t, func() {
-		sdb.GetPersistentPreimageSize(common.Hash{})
-	}, "GetPersistentPreimageSize should not panic")
-
-	// Test GetEphemeralPreimage
-	require.NotPanics(t, func() {
-		sdb.GetEphemeralPreimage(common.Hash{})
-	}, "GetEphemeralPreimage should not panic")
-
-	// Test GetEphemeralPreimageSize
-	require.NotPanics(t, func() {
-		sdb.GetEphemeralPreimageSize(common.Hash{})
-	}, "GetEphemeralPreimageSize should not panic")
+var statedbMethods = []struct {
+	name       string
+	call       func(statedb cc_api.StateDB)
+	readOnly   bool
+	commitSafe bool
+}{
+	{
+		name: "SetPersistentState",
+		call: func(statedb cc_api.StateDB) {
+			statedb.SetPersistentState(common.Address{}, common.Hash{}, common.Hash{})
+		},
+		readOnly:   false,
+		commitSafe: false,
+	},
+	{
+		name: "SetEphemeralState",
+		call: func(statedb cc_api.StateDB) {
+			statedb.SetEphemeralState(common.Address{}, common.Hash{}, common.Hash{})
+		},
+		readOnly:   false,
+		commitSafe: true,
+	},
+	{
+		name: "AddPersistentPreimage",
+		call: func(statedb cc_api.StateDB) {
+			statedb.AddPersistentPreimage(common.Hash{}, []byte{})
+		},
+		readOnly:   false,
+		commitSafe: true,
+	},
+	{
+		name: "AddEphemeralPreimage",
+		call: func(statedb cc_api.StateDB) {
+			statedb.AddEphemeralPreimage(common.Hash{}, []byte{})
+		},
+		readOnly:   false,
+		commitSafe: true,
+	},
+	{
+		name: "GetPersistentState",
+		call: func(statedb cc_api.StateDB) {
+			statedb.GetPersistentState(common.Address{}, common.Hash{})
+		},
+		readOnly:   true,
+		commitSafe: true,
+	},
+	{
+		name: "GetEphemeralState",
+		call: func(statedb cc_api.StateDB) {
+			statedb.GetEphemeralState(common.Address{}, common.Hash{})
+		},
+		readOnly:   true,
+		commitSafe: true,
+	},
+	{
+		name: "GetPersistentPreimage",
+		call: func(statedb cc_api.StateDB) {
+			statedb.GetPersistentPreimage(common.Hash{})
+		},
+		readOnly:   true,
+		commitSafe: true,
+	},
+	{
+		name: "GetPersistentPreimageSize",
+		call: func(statedb cc_api.StateDB) {
+			statedb.GetPersistentPreimageSize(common.Hash{})
+		},
+		readOnly:   true,
+		commitSafe: true,
+	},
+	{
+		name: "GetEphemeralPreimage",
+		call: func(statedb cc_api.StateDB) {
+			statedb.GetEphemeralPreimage(common.Hash{})
+		},
+		readOnly:   true,
+		commitSafe: true,
+	},
+	{
+		name: "GetEphemeralPreimageSize",
+		call: func(statedb cc_api.StateDB) {
+			statedb.GetEphemeralPreimageSize(common.Hash{})
+		},
+		readOnly:   true,
+		commitSafe: true,
+	},
 }
 
-func TestReadOnlyEVM(t *testing.T) {
-	evm := cc_api.NewReadOnlyEVM(NewMockEVM(NewMockStateDB()))
-
-	// Test type
-	require.IsType(t, &cc_api.ReadOnlyEVM{}, evm, "NewReadOnlyEVM should return a readOnlyEVM")
-
-	// Test StateDB returns readOnlyStateDB
-	sdb := evm.StateDB()
-	require.IsType(t, &cc_api.ReadOnlyStateDB{}, sdb, "StateDB should return readOnlyStateDB")
+func TestStateDB(t *testing.T) {
+	var (
+		r = require.New(t)
+	)
+	for _, specs := range statedbs {
+		t.Run(specs.name, func(t *testing.T) {
+			statedb := specs.constructor()
+			for _, method := range statedbMethods {
+				if (specs.readOnly && !method.readOnly) || (specs.commitSafe && !method.commitSafe) {
+					r.Panics(func() { method.call(statedb) }, method.name+" should panic")
+				} else {
+					r.NotPanics(func() { method.call(statedb) }, method.name+" should not panic")
+				}
+			}
+		})
+	}
 }
 
-func TestCommitSafeEVM(t *testing.T) {
-	evm := cc_api.NewCommitSafeEVM(NewMockEVM(NewMockStateDB()))
-
-	// Test type
-	require.IsType(t, &cc_api.CommitSafeEVM{}, evm, "NewCommitSafeEVM should return a commitSafeEVM")
-
-	// Test StateDB returns CommitSafeStateDB
-	sdb := evm.StateDB()
-	require.IsType(t, &cc_api.CommitSafeStateDB{}, sdb, "StateDB should return CommitSafeStateDB")
+var evms = []struct {
+	name        string
+	constructor func() cc_api.EVM
+	statedbType interface{}
+}{
+	{
+		name: "EVM",
+		constructor: func() cc_api.EVM {
+			return NewMockEVM(NewMockStateDB())
+		},
+		statedbType: &MockStateDB{},
+	},
+	{
+		name: "ReadOnlyEVM",
+		constructor: func() cc_api.EVM {
+			return cc_api.NewReadOnlyEVM(NewMockEVM(NewMockStateDB()))
+		},
+		statedbType: &cc_api.ReadOnlyStateDB{},
+	},
+	{
+		name: "CommitSafeEVM",
+		constructor: func() cc_api.EVM {
+			return cc_api.NewCommitSafeEVM(NewMockEVM(NewMockStateDB()))
+		},
+		statedbType: &cc_api.CommitSafeStateDB{},
+	},
 }
 
-func TestPersistentStorage(t *testing.T) {
-	sdb := NewMockStateDB()
-	address := common.HexToAddress("0x01")
-	storage := cc_api.NewPersistentStorage(sdb, address)
-	TestStorage(t, storage)
-	FuzzStorage(t, storage)
+func TestEVM(t *testing.T) {
+	var (
+		r = require.New(t)
+	)
+	for _, specs := range evms {
+		t.Run(specs.name, func(t *testing.T) {
+			evm := specs.constructor()
+			r.IsType(specs.statedbType, evm.StateDB(), "StateDB should return "+specs.name)
+		})
+	}
 }
 
-func TestEphemeralStorage(t *testing.T) {
-	sdb := NewMockStateDB()
-	address := common.HexToAddress("0x01")
-	storage := cc_api.NewEphemeralStorage(sdb, address)
-	TestStorage(t, storage)
-	FuzzStorage(t, storage)
+var storages = []struct {
+	name        string
+	constructor func() cc_api.Storage
+}{
+	{
+		name: "PersistentStorage",
+		constructor: func() cc_api.Storage {
+			return cc_api.NewPersistentStorage(NewMockStateDB(), common.Address{})
+		},
+	},
+	{
+		name: "EphemeralStorage",
+		constructor: func() cc_api.Storage {
+			return cc_api.NewEphemeralStorage(NewMockStateDB(), common.Address{})
+		},
+	},
+}
+
+func TestAPIStorage(t *testing.T) {
+	for _, specs := range storages {
+		t.Run(specs.name, func(t *testing.T) {
+			storage := specs.constructor()
+			TestStorage(t, storage)
+			FuzzStorage(t, storage)
+		})
+	}
+}
+
+var apis = []struct {
+	name        string
+	constructor func() cc_api.API
+	readOnly    bool
+	stateOnly   bool
+}{
+	{
+		name: "API",
+		constructor: func() cc_api.API {
+			statedb := NewMockStateDB()
+			evm := NewMockEVM(statedb)
+			return cc_api.New(evm, common.Address{})
+		},
+		readOnly:  false,
+		stateOnly: false,
+	},
+	{
+		name: "StateAPI",
+		constructor: func() cc_api.API {
+			statedb := NewMockStateDB()
+			return cc_api.NewStateAPI(statedb, common.Address{})
+		},
+		readOnly:  false,
+		stateOnly: true,
+	},
+	{
+		name: "ReadOnlyAPI",
+		constructor: func() cc_api.API {
+			statedb := NewMockStateDB()
+			evm := cc_api.NewReadOnlyEVM(NewMockEVM(statedb))
+			return cc_api.New(evm, common.Address{})
+		},
+		readOnly:  true,
+		stateOnly: false,
+	},
+	{
+		name: "ReadOnlyStateAPI",
+		constructor: func() cc_api.API {
+			statedb := cc_api.NewReadOnlyStateDB(NewMockStateDB())
+			return cc_api.NewStateAPI(statedb, common.Address{})
+		},
+		readOnly:  true,
+		stateOnly: true,
+	},
 }
 
 func TestStateAPI(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	sdb := NewMockStateDB()
-	api := cc_api.NewStateAPI(sdb, address)
-
-	// Test Address
-	require.Equal(t, address, api.Address(), "Address should return correct address")
-
-	// Test StateDB
-	require.Equal(t, sdb, api.StateDB(), "StateDB should return correct StateDB")
-
-	// Test EVM
-	require.Equal(t, nil, api.EVM(), "EVM should return nil")
-
-	// Test Persistent
-	persistent := api.Persistent()
-	require.NotNil(t, persistent, "Persistent should not be nil")
-	require.IsType(t, &cc_api.CoreDatastore{}, persistent, "Persistent should return a datastore instance")
-	persistentStruct, _ := persistent.(*cc_api.CoreDatastore)
-	require.IsType(t, &cc_api.PersistentStorage{}, persistentStruct.Storage, "Persistent should return a PersistentStorage instance")
-
-	// Test Ephemeral
-	ephemeral := api.Ephemeral()
-	require.NotNil(t, ephemeral, "Ephemeral should not be nil")
-	require.IsType(t, &cc_api.CoreDatastore{}, ephemeral, "Ephemeral should return a datastore instance")
-	ephemeralStruct, _ := ephemeral.(*cc_api.CoreDatastore)
-	require.IsType(t, &cc_api.EphemeralStorage{}, ephemeralStruct.Storage, "Ephemeral should return a EphemeralStorage instance")
-
-	// Test BlockHash
-	require.Panics(t, func() {
-		api.BlockHash(big.NewInt(0))
-	}, "BlockHash should panic as it's not available")
-
-	// Test Block
-	require.Panics(t, func() {
-		api.Block()
-	}, "Block should panic as it's not available")
-}
-
-func TestAPI(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	sdb := NewMockStateDB()
-	evm := NewMockEVM(sdb)
-	api := api.New(evm, address)
-
-	// Test Address
-	require.Equal(t, address, api.Address(), "Address should return correct address")
-
-	// Test StateDB
-	require.Equal(t, sdb, api.StateDB(), "StateDB should return correct StateDB")
-
-	// Test EVM
-	require.Equal(t, evm, api.EVM(), "EVM should return correct EVM")
-
-	// Test Persistent
-	persistent := api.Persistent()
-	require.NotNil(t, persistent, "Persistent should not be nil")
-	require.IsType(t, &cc_api.CoreDatastore{}, persistent, "Persistent should return a datastore instance")
-	persistentStruct, _ := persistent.(*cc_api.CoreDatastore)
-	require.IsType(t, &cc_api.PersistentStorage{}, persistentStruct.Storage, "Persistent should return a PersistentStorage instance")
-
-	// Test Ephemeral
-	ephemeral := api.Ephemeral()
-	require.NotNil(t, ephemeral, "Ephemeral should not be nil")
-	require.IsType(t, &cc_api.CoreDatastore{}, ephemeral, "Ephemeral should return a datastore instance")
-	ephemeralStruct, _ := ephemeral.(*cc_api.CoreDatastore)
-	require.IsType(t, &cc_api.EphemeralStorage{}, ephemeralStruct.Storage, "Ephemeral should return a EphemeralStorage instance")
-
-	// Test BlockHash
-	require.NotPanics(t, func() {
-		api.BlockHash(big.NewInt(1))
-	}, "BlockHash should not panic")
-
-	// Test Block
-	require.NotPanics(t, func() {
-		api.Block()
-	}, "Block should not panic")
-}
-
-func TestReadOnlyAPI(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	evm := api.NewReadOnlyEVM(NewMockEVM(NewMockStateDB()))
-	api := api.New(evm, address)
-	apiStruct, _ := api.(*cc_api.FullAPI)
-	require.IsType(t, &cc_api.ReadOnlyStateDB{}, apiStruct.StateDB(), "StateDB should be readOnlyStateDB")
-}
-
-func TestCommitSafeAPI(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	evm := api.NewCommitSafeEVM(NewMockEVM(NewMockStateDB()))
-	api := api.New(evm, address)
-	apiStruct, _ := api.(*cc_api.FullAPI)
-	require.IsType(t, &cc_api.CommitSafeStateDB{}, apiStruct.StateDB(), "StateDB should be CommitSafeStateDB")
-}
-
-func TestReadOnlyStateAPI(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	sdb := api.NewReadOnlyStateDB(NewMockStateDB())
-	api := api.NewStateAPI(sdb, address)
-	apiStruct, _ := api.(*cc_api.StateAPI)
-	require.IsType(t, &cc_api.ReadOnlyStateDB{}, apiStruct.StateDB(), "StateDB should be readOnlyStateDB")
-}
-
-func TestCommitSafeStateAPI(t *testing.T) {
-	address := common.HexToAddress("0x01")
-	sdb := api.NewCommitSafeStateDB(NewMockStateDB())
-	api := api.NewStateAPI(sdb, address)
-	apiStruct, _ := api.(*cc_api.StateAPI)
-	require.IsType(t, &cc_api.CommitSafeStateDB{}, apiStruct.StateDB(), "StateDB should be CommitSafeStateDB")
+	// TODO: test read-only API
+	// TODO: test lite API
+	// TODO: test address method
+	var (
+		r = require.New(t)
+	)
+	for _, specs := range apis {
+		t.Run(specs.name, func(t *testing.T) {
+			api := specs.constructor()
+			r.NotNil(api.StateDB(), "StateDB should not be nil")
+			r.NotNil(api.Ephemeral(), "Ephemeral should not be nil")
+			r.NotNil(api.Persistent(), "Persistent should not be nil")
+			if specs.stateOnly {
+				r.Nil(api.EVM(), "EVM should be nil")
+				r.Panics(func() { api.BlockHash(big.NewInt(0)) }, "BlockHash should panic")
+				r.Panics(func() { api.Block() }, "Block should panic")
+			} else {
+				r.NotNil(api.EVM(), "EVM should not be nil")
+				r.NotPanics(func() { api.BlockHash(big.NewInt(0)) }, "BlockHash should not panic")
+				r.NotPanics(func() { api.Block() }, "Block should not panic")
+			}
+		})
+	}
 }

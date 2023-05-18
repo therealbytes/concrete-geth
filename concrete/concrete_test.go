@@ -19,13 +19,13 @@ import (
 	_ "embed"
 	"fmt"
 	"math/big"
-	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/contracts"
 	"github.com/ethereum/go-ethereum/concrete/lib"
+	"github.com/ethereum/go-ethereum/concrete/lib/precompiles"
 	"github.com/ethereum/go-ethereum/concrete/wasm"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -39,87 +39,88 @@ import (
 //go:embed wasm/bin/typical.wasm
 var typicalWasm []byte
 
-func testPrecompile(t *testing.T, pcAddr common.Address) {
+var implementations = []struct {
+	name    string
+	address common.Address
+	pc      cc_api.Precompile
+}{
+	{
+		name:    "Native",
+		address: common.BytesToAddress([]byte{128}),
+		pc:      &precompiles.TypicalPrecompile{},
+	},
+	{
+		name:    "Wasm",
+		address: common.BytesToAddress([]byte{129}),
+		pc:      wasm.NewWasmPrecompile(typicalWasm),
+	},
+}
+
+func TestPrecompile(t *testing.T) {
 	var (
+		r             = require.New(t)
 		runCounterKey = crypto.Keccak256Hash([]byte("typical.counter.0"))
 		hashSetKey    = crypto.Keccak256Hash([]byte("typical.set.0"))
 		key, _        = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-		address       = crypto.PubkeyToAddress(key.PublicKey)
-		funds         = big.NewInt(1000000000000000)
-		gspec         = &core.Genesis{
-			Config: params.TestChainConfig,
-			Alloc: core.GenesisAlloc{
-				pcAddr:  {Balance: common.Big1},
-				address: {Balance: funds},
-			},
-			BaseFee: big.NewInt(params.InitialBaseFee),
-		}
-		signer  = types.LatestSigner(gspec.Config)
-		nBlocks = 5
-		nTx     = 5
+		senderAddress = crypto.PubkeyToAddress(key.PublicKey)
+		nBlocks       = 5
+		nTx           = 5
 	)
+	for _, impl := range implementations {
+		contracts.AddPrecompile(impl.address, impl.pc)
+		t.Run(impl.name, func(t *testing.T) {
+			var (
+				gspec = &core.Genesis{
+					Config: params.TestChainConfig,
+					Alloc: core.GenesisAlloc{
+						impl.address:  {Balance: common.Big1},
+						senderAddress: {Balance: big.NewInt(1000000000000000)},
+					},
+				}
+				signer    = types.LatestSigner(gspec.Config)
+				pcAddress = impl.address
+			)
 
-	hashes := make([]common.Hash, 0, nBlocks)
-	preimages := make([][]byte, 0, nBlocks)
+			hashes := make([]common.Hash, 0, nBlocks)
+			preimages := make([][]byte, 0, nBlocks)
 
-	db, blocks, receipts := core.GenerateChainWithGenesis(gspec, ethash.NewFaker(), nBlocks, func(ii int, block *core.BlockGen) {
-		for jj := 0; jj < nTx; jj++ {
-			str := fmt.Sprintf("preimage %d %d", ii, jj)
-			preimage := []byte(str)
-			hash := crypto.Keccak256Hash(preimage)
-			preimages = append(preimages, preimage)
-			hashes = append(hashes, hash)
+			db, blocks, receipts := core.GenerateChainWithGenesis(gspec, ethash.NewFaker(), nBlocks, func(ii int, block *core.BlockGen) {
+				for jj := 0; jj < nTx; jj++ {
+					str := fmt.Sprintf("preimage %d %d", ii, jj)
+					preimage := []byte(str)
+					hash := crypto.Keccak256Hash(preimage)
+					preimages = append(preimages, preimage)
+					hashes = append(hashes, hash)
+					tx, err := types.SignTx(types.NewTransaction(block.TxNonce(senderAddress), pcAddress, common.Big0, 1_000_000, block.BaseFee(), preimage), signer, key)
+					r.NoError(err)
+					block.AddTx(tx)
+				}
+			})
 
-			tx, err := types.SignTx(types.NewTransaction(block.TxNonce(address), pcAddr, common.Big0, 1_000_000, block.BaseFee(), preimage), signer, key)
-			require.NoError(t, err)
-			block.AddTx(tx)
-		}
-	})
+			for _, block := range receipts {
+				for _, receipt := range block {
+					r.Equal(uint64(1), receipt.Status)
+				}
+			}
 
-	for _, rr := range receipts {
-		for _, r := range rr {
-			require.Equal(t, uint64(1), r.Status)
-		}
+			root := blocks[nBlocks-1].Root()
+			statedb, err := state.New(root, state.NewDatabase(db), nil)
+			r.NoError(err)
+
+			persistent := cc_api.NewCoreDatastore(cc_api.NewPersistentStorage(statedb, pcAddress))
+			counter := lib.NewCounter(persistent.NewReference(runCounterKey))
+			set := persistent.NewSet(hashSetKey)
+
+			totalTxs := nBlocks * nTx
+
+			r.Equal(new(big.Int).SetInt64(int64(totalTxs)), counter.Get())
+			r.Equal(totalTxs, set.Size())
+
+			for ii, hash := range hashes {
+				preimage := preimages[ii]
+				r.True(set.Has(hash))
+				r.Equal(preimage, statedb.GetPersistentPreimage(hash))
+			}
+		})
 	}
-
-	root := blocks[nBlocks-1].Root()
-	statedb, err := state.New(root, state.NewDatabase(db), nil)
-	require.NoError(t, err)
-
-	persistent := cc_api.NewCoreDatastore(cc_api.NewPersistentStorage(statedb, pcAddr))
-	counter := lib.NewCounter(persistent.NewReference(runCounterKey))
-	set := persistent.NewSet(hashSetKey)
-
-	totalTxs := nBlocks * nTx
-
-	require.Equal(t, new(big.Int).SetInt64(int64(totalTxs)), counter.Get())
-	require.Equal(t, totalTxs, set.Size())
-
-	for ii, hash := range hashes {
-		preimage := preimages[ii]
-		require.True(t, set.Has(hash))
-		require.Equal(t, preimage, statedb.GetPersistentPreimage(hash))
-	}
-}
-
-var mutex sync.Mutex
-
-func TestNativePrecompile(t *testing.T) {
-	address := common.BytesToAddress([]byte{128})
-	pc := &lib.TypicalPrecompile{}
-	mutex.Lock()
-	err := contracts.AddPrecompile(address, pc)
-	mutex.Unlock()
-	require.NoError(t, err)
-	testPrecompile(t, address)
-}
-
-func TestWasmPrecompile(t *testing.T) {
-	address := common.BytesToAddress([]byte{129})
-	pc := wasm.NewWasmPrecompile(typicalWasm, address)
-	mutex.Lock()
-	err := contracts.AddPrecompile(address, pc)
-	mutex.Unlock()
-	require.NoError(t, err)
-	testPrecompile(t, address)
 }

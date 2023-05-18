@@ -46,23 +46,6 @@ func (pc *BlankPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
 
 var _ cc_api.Precompile = &BlankPrecompile{}
 
-type EchoPrecompile struct {
-	BlankPrecompile
-}
-
-func (pc *EchoPrecompile) RequiredGas(input []byte) uint64 {
-	if len(input) == 0 {
-		return 0
-	}
-	return uint64(input[0])
-}
-
-func (pc *EchoPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
-	return input, nil
-}
-
-var _ cc_api.Precompile = &EchoPrecompile{}
-
 type PrecompileDemux map[int]cc_api.Precompile
 
 func (d PrecompileDemux) getSelect(input []byte) int {

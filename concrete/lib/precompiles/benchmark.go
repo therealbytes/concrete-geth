@@ -13,18 +13,21 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package lib
+package precompiles
 
 import (
 	"time"
 
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/crypto"
+	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/tinygo/std"
 )
 
+// A precompiled used for benchmarking TinyGo WASM.
+
 type BenchmarkPrecompile struct {
-	BlankPrecompile
+	lib.BlankPrecompile
 }
 
 func (pc *BenchmarkPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
@@ -66,7 +69,7 @@ func (pc *BenchmarkPrecompile) Run(api cc_api.API, input []byte) ([]byte, error)
 
 	runEnd := std.Now()
 
-	std.Print("[internal] BenchmarkPrecompile.Run", runEnd.Sub(runStart).Nanoseconds(), "ns")
+	std.Print("BenchmarkPrecompile.Run", runEnd.Sub(runStart).Microseconds(), "μs")
 
 	return nil, nil
 }

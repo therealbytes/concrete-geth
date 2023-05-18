@@ -26,22 +26,26 @@ import (
 )
 
 func TestAddPrecompile(t *testing.T) {
-	n := 10
-	pcs := ActivePrecompiles()
-	require.Empty(t, pcs, "Expected no precompiles")
+	var (
+		r   = require.New(t)
+		n   = 10
+		pcs = ActivePrecompiles()
+	)
+
+	r.Empty(pcs, "Expected no precompiles")
 
 	for i := byte(0); i < byte(n); i++ {
 		addr := common.BytesToAddress([]byte{i})
 		err := AddPrecompile(addr, &lib.BlankPrecompile{})
-		require.NoError(t, err, "AddPrecompile should not return an error")
+		r.NoError(err, "AddPrecompile should not return an error")
 		_, ok := GetPrecompile(addr)
-		require.True(t, ok, "Expected precompile at address %x", addr)
+		r.True(ok, "Expected precompile at address %x", addr)
 		pcAddr := ActivePrecompiles()[i]
-		require.Equal(t, addr, pcAddr, "Expected precompile at address %x, got %x", addr, pcAddr)
+		r.Equal(addr, pcAddr, "Expected precompile at address %x, got %x", addr, pcAddr)
 	}
 
 	pcs = ActivePrecompiles()
-	require.Len(t, pcs, n, "Expected %d precompiles", n)
+	r.Len(pcs, n, "Expected %d precompiles", n)
 }
 
 var (
@@ -69,27 +73,31 @@ func (p *testPrecompile) Run(api cc_api.API, input []byte) (output []byte, err e
 var _ cc_api.Precompile = (*testPrecompile)(nil)
 
 func TestRunPrecompile(t *testing.T) {
+	var (
+		r     = require.New(t)
+		addr  = common.BytesToAddress([]byte{1})
+		pc    = &testPrecompile{}
+		evm   = cc_api_test.NewMockEVM(cc_api_test.NewMockStateDB())
+		input = []byte{0}
+	)
+	var (
+		suppliedGas = uint64(0)
+		readOnly    = false
+	)
+
 	REQUIRED_GAS = uint64(10)
 	MUTATES_STORAGE = true
 
-	addr := common.BytesToAddress([]byte{1})
-	pc := &testPrecompile{}
-	evm := cc_api_test.NewMockEVM(cc_api_test.NewMockStateDB())
-
-	input := []byte{0}
-	suppliedGas := uint64(0)
-	readOnly := false
-
 	// Test invalid supplied gas
 	_, _, err := RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-	require.Error(t, err, "Expected error")
+	r.Error(err, "Expected error")
 
 	// Test successful run and gas consumption
 	for ii := uint64(1); ii < 3; ii++ {
 		suppliedGas = ii * REQUIRED_GAS
 		_, remainingGas, err := RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-		require.NoError(t, err, "Error should be nil")
-		require.Equal(t, suppliedGas-REQUIRED_GAS, remainingGas, "unexpected remaining gas")
+		r.NoError(err, "Error should be nil")
+		r.Equal(suppliedGas-REQUIRED_GAS, remainingGas, "unexpected remaining gas")
 	}
 
 	suppliedGas = REQUIRED_GAS
@@ -97,12 +105,12 @@ func TestRunPrecompile(t *testing.T) {
 
 	// Test read-only error when precompile mutates storage
 	_, _, err = RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
-	require.Error(t, err, "Expected error")
+	r.Error(err, "Expected error")
 
 	MUTATES_STORAGE = false
 
 	// Test panic when non-mutating precompile attempts to mutates storage
-	require.Panics(t, func() {
+	r.Panics(func() {
 		_, _, _ = RunPrecompile(evm, addr, pc, input, suppliedGas, readOnly)
 	}, "Expected panic")
 }

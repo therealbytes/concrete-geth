@@ -13,13 +13,16 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package lib
+package precompiles
 
 import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/crypto"
+	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/tinygo/std"
 )
+
+// A precompile used for testing.
 
 // We use std.Keccak256Hash instead of crypto.Keccak256Hash because the latter
 // may not compile in tinygo as may depend on a host function.
@@ -58,7 +61,7 @@ func (pc *TypicalPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
 	per := api.Persistent()
 	eph := api.Ephemeral()
 
-	counter := NewCounter(per.NewReference(runCounterKey))
+	counter := lib.NewCounter(per.NewReference(runCounterKey))
 	counter.Inc()
 
 	hashSet := per.NewSet(hashSetKey)
