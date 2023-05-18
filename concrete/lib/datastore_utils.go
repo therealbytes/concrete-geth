@@ -20,7 +20,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/crypto"
 )
+
+func NewKey(name string) common.Hash {
+	// Use /concrete/crypto instead of /crypto because the latter won't compile
+	// in tinygo as it has unsupported dependencies.
+	return crypto.Keccak256Hash([]byte(name))
+}
 
 type Counter struct {
 	cc_api.Reference
@@ -44,8 +51,18 @@ func (c *Counter) Add(delta *big.Int) {
 	c.Set(value)
 }
 
+func (c *Counter) Sub(delta *big.Int) {
+	value := c.Get()
+	value.Sub(value, delta)
+	c.Set(value)
+}
+
 func (c *Counter) Inc() {
 	c.Add(common.Big1)
+}
+
+func (c *Counter) Dec() {
+	c.Sub(common.Big1)
 }
 
 type nestedMap struct {
