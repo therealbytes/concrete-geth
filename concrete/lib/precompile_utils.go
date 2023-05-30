@@ -46,10 +46,10 @@ func (pc *BlankPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
 
 var _ cc_api.Precompile = &BlankPrecompile{}
 
-type PrecompileDemux map[int]cc_api.Precompile
+type PrecompileDemux map[uint]cc_api.Precompile
 
-func (d PrecompileDemux) getSelect(input []byte) int {
-	return int(new(big.Int).SetBytes(GetData(input, 0, 32)).Uint64())
+func (d PrecompileDemux) getSelect(input []byte) uint {
+	return uint(new(big.Int).SetBytes(GetData(input, 0, 32)).Uint64())
 }
 
 func (d PrecompileDemux) MutatesStorage(input []byte) bool {
