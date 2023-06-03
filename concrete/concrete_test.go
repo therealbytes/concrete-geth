@@ -23,9 +23,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
-	"github.com/ethereum/go-ethereum/concrete/contracts"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/concrete/lib/precompiles"
+	cc_precompiles "github.com/ethereum/go-ethereum/concrete/precompiles"
 	"github.com/ethereum/go-ethereum/concrete/wasm"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -67,7 +67,7 @@ func TestPrecompile(t *testing.T) {
 		nTx           = 5
 	)
 	for _, impl := range implementations {
-		contracts.AddPrecompile(impl.address, impl.pc)
+		cc_precompiles.AddPrecompile(impl.address, impl.pc)
 		t.Run(impl.name, func(t *testing.T) {
 			var (
 				gspec = &core.Genesis{

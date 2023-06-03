@@ -57,6 +57,10 @@ func newReadWriteStorage(read, write cc_api.Storage) cc_api.Storage {
 	}
 }
 
+func (s *readWriteStorage) StateDB() cc_api.StateDB {
+	panic("not implemented")
+}
+
 func (s *readWriteStorage) Address() common.Address {
 	return s.read.Address()
 }

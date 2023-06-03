@@ -24,7 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
-	cc_contracts "github.com/ethereum/go-ethereum/concrete/contracts"
+	cc_precompiles "github.com/ethereum/go-ethereum/concrete/precompiles"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -61,7 +61,7 @@ func (evm *EVM) precompile(addr common.Address) (PrecompiledContract, bool) {
 }
 
 func (evm *EVM) concretePrecompile(addr common.Address) (cc_api.Precompile, bool) {
-	return cc_contracts.GetPrecompile(addr)
+	return cc_precompiles.GetPrecompile(addr)
 }
 
 // BlockContext provides the EVM with auxiliary information. Once provided
@@ -232,7 +232,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	if isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else if isConcretePrecompile {
-		ret, gas, err = cc_contracts.RunPrecompile(evm.NewConcreteEVM(), addr, ccp, input, gas, evm.Interpreter().readOnly)
+		ret, gas, err = cc_precompiles.RunPrecompile(evm.NewConcreteEVM(), addr, ccp, input, gas, evm.Interpreter().readOnly)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
@@ -297,7 +297,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else if ccp, isConcretePrecompile := evm.concretePrecompile(addr); isConcretePrecompile {
-		ret, gas, err = cc_contracts.RunPrecompile(evm.NewConcreteEVM(), addr, ccp, input, gas, evm.Interpreter().readOnly)
+		ret, gas, err = cc_precompiles.RunPrecompile(evm.NewConcreteEVM(), addr, ccp, input, gas, evm.Interpreter().readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -344,7 +344,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else if ccp, isConcretePrecompile := evm.concretePrecompile(addr); isConcretePrecompile {
-		ret, gas, err = cc_contracts.RunPrecompile(evm.NewConcreteEVM(), addr, ccp, input, gas, evm.Interpreter().readOnly)
+		ret, gas, err = cc_precompiles.RunPrecompile(evm.NewConcreteEVM(), addr, ccp, input, gas, evm.Interpreter().readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and make initialise the delegate values
@@ -395,7 +395,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else if ccp, isConcretePrecompile := evm.concretePrecompile(addr); isConcretePrecompile {
-		ret, gas, err = cc_contracts.RunPrecompile(evm.NewConcreteEVM(), addr, ccp, input, gas, true)
+		ret, gas, err = cc_precompiles.RunPrecompile(evm.NewConcreteEVM(), addr, ccp, input, gas, true)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'

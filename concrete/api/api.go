@@ -23,13 +23,14 @@ import (
 )
 
 var (
-	// EmptyPreimageHash = crypto.Keccak256Hash(nil)
+	// crypto.Keccak256Hash(nil)
 	EmptyPreimageHash = common.HexToHash("0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")
 )
 
 var (
-	// HashRegistryAddress = common.BytesToAddress(crypto.Keccak256([]byte("concrete.HashRegistry.v0")))
-	HashRegistryAddress = common.HexToAddress("0x5a1aca093af3a4645ae880200333893724c94e92")
+	PrecompileRegistryAddress  = common.HexToAddress("0xcc00000000000000000000000000000000000000")
+	PreimageRegistryAddress    = common.HexToAddress("0xcc00000000000000000000000000000000000001")
+	BigPreimageRegistryAddress = common.HexToAddress("0xcc00000000000000000000000000000000000002")
 )
 
 type StateDB interface {
@@ -123,23 +124,36 @@ func (evm *CommitSafeEVM) StateDB() StateDB {
 
 var _ EVM = &CommitSafeEVM{}
 
-type Storage interface {
-	Address() common.Address
+type TrieStore interface {
 	Set(key common.Hash, value common.Hash)
 	Get(key common.Hash) common.Hash
+}
+
+type PreimageStore interface {
 	AddPreimage(preimage []byte) common.Hash
 	HasPreimage(hash common.Hash) bool
 	GetPreimage(hash common.Hash) []byte
 	GetPreimageSize(hash common.Hash) int
 }
 
-func hashRegistryKey(hash common.Hash) common.Hash {
+type Storage interface {
+	TrieStore
+	PreimageStore
+	StateDB() StateDB
+	Address() common.Address
+}
+
+func preimageRegistryKey(hash common.Hash) common.Hash {
 	return crypto.Keccak256Hash(hash.Bytes(), common.Big0.Bytes())
 }
 
 type PersistentStorage struct {
 	address common.Address
 	db      StateDB
+}
+
+func (s *PersistentStorage) StateDB() StateDB {
+	return s.db
 }
 
 func (s *PersistentStorage) Address() common.Address {
@@ -159,7 +173,7 @@ func (s *PersistentStorage) AddPreimage(preimage []byte) common.Hash {
 		return EmptyPreimageHash
 	}
 	hash := crypto.Keccak256Hash(preimage)
-	s.db.SetPersistentState(HashRegistryAddress, hashRegistryKey(hash), common.BytesToHash(common.Big1.Bytes()))
+	s.db.SetPersistentState(PreimageRegistryAddress, preimageRegistryKey(hash), common.BytesToHash(common.Big1.Bytes()))
 	s.db.AddPersistentPreimage(hash, preimage)
 	return hash
 }
@@ -168,7 +182,7 @@ func (s *PersistentStorage) HasPreimage(hash common.Hash) bool {
 	if hash == EmptyPreimageHash {
 		return true
 	}
-	return s.db.GetPersistentState(HashRegistryAddress, hashRegistryKey(hash)) == common.BytesToHash(common.Big1.Bytes())
+	return s.db.GetPersistentState(PreimageRegistryAddress, preimageRegistryKey(hash)) == common.BytesToHash(common.Big1.Bytes())
 }
 
 func (s *PersistentStorage) GetPreimage(hash common.Hash) []byte {
@@ -198,6 +212,10 @@ type EphemeralStorage struct {
 	db      StateDB
 }
 
+func (s *EphemeralStorage) StateDB() StateDB {
+	return s.db
+}
+
 func (s *EphemeralStorage) Address() common.Address {
 	return s.address
 }
@@ -215,7 +233,7 @@ func (s *EphemeralStorage) AddPreimage(preimage []byte) common.Hash {
 		return EmptyPreimageHash
 	}
 	hash := crypto.Keccak256Hash(preimage)
-	s.db.SetEphemeralState(HashRegistryAddress, hashRegistryKey(hash), common.BytesToHash(common.Big1.Bytes()))
+	s.db.SetEphemeralState(PreimageRegistryAddress, preimageRegistryKey(hash), common.BytesToHash(common.Big1.Bytes()))
 	s.db.AddEphemeralPreimage(hash, preimage)
 	return hash
 }
@@ -224,7 +242,7 @@ func (s *EphemeralStorage) HasPreimage(hash common.Hash) bool {
 	if hash == EmptyPreimageHash {
 		return true
 	}
-	return s.db.GetEphemeralState(HashRegistryAddress, hashRegistryKey(hash)) == common.BytesToHash(common.Big1.Bytes())
+	return s.db.GetEphemeralState(PreimageRegistryAddress, preimageRegistryKey(hash)) == common.BytesToHash(common.Big1.Bytes())
 }
 
 func (s *EphemeralStorage) GetPreimage(hash common.Hash) []byte {

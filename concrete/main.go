@@ -23,7 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/cmd/geth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
-	"github.com/ethereum/go-ethereum/concrete/contracts"
+	"github.com/ethereum/go-ethereum/concrete/precompiles"
 	"github.com/ethereum/go-ethereum/concrete/wasm"
 	"github.com/urfave/cli/v2"
 )
@@ -67,12 +67,12 @@ func (a *concreteGeth) AddPrecompile(addr common.Address, pc api.Precompile) err
 	if err := a.validateNewPCAddress(addr); err != nil {
 		return err
 	}
-	return contracts.AddPrecompile(addr, pc)
+	return precompiles.AddPrecompile(addr, pc)
 }
 
 func (a *concreteGeth) AddPrecompileWasm(addr common.Address, code []byte) error {
 	if err := a.validateNewPCAddress(addr); err != nil {
 		return err
 	}
-	return contracts.AddPrecompile(addr, wasm.NewWasmPrecompile(code))
+	return precompiles.AddPrecompile(addr, wasm.NewWasmPrecompile(code))
 }

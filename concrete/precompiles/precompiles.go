@@ -13,27 +13,71 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-package contracts
+package precompiles
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/lib"
 )
 
 var (
 	precompiles          = make(map[common.Address]api.Precompile)
 	precompiledAddresses = make([]common.Address, 0)
+	precompileMetadata   = make([]PrecompileMetadata, 0)
+	metadataByAddress    = make(map[common.Address]*PrecompileMetadata)
+	metadataByName       = make(map[string]*PrecompileMetadata)
 )
 
-func AddPrecompile(addr common.Address, p api.Precompile) error {
+type PrecompileMetadata struct {
+	Addr        common.Address `json:"addr"`
+	Name        string         `json:"name"`
+	Version     string         `json:"version"`
+	Author      string         `json:"author"`
+	Description string         `json:"description"`
+	Source      string         `json:"source"`
+	ABI         string         `json:"ABI"`
+}
+
+func AddPrecompile(addr common.Address, p api.Precompile, args ...interface{}) error {
+	var metadata PrecompileMetadata
+
+	if len(args) > 0 {
+		if m, ok := args[0].(PrecompileMetadata); ok {
+			metadata = m
+		}
+	}
+
+	if _, ok := metadataByName[metadata.Name]; ok {
+		return fmt.Errorf("precompile already exists with name %s", metadata.Name)
+	}
 	if _, ok := precompiles[addr]; ok {
 		return fmt.Errorf("precompile already exists at address %x", addr)
 	}
+
+	metadata.Addr = addr
+
+	if pwabi, ok := p.(*lib.PrecompileWithABI); ok {
+		abiJson, err := json.Marshal(pwabi.ABI)
+		if err != nil {
+			return err
+		}
+		metadata.ABI = string(abiJson)
+	}
+
 	precompiles[addr] = p
 	precompiledAddresses = append(precompiledAddresses, addr)
+	precompileMetadata = append(precompileMetadata, metadata)
+	metadataByAddress[addr] = &metadata
+
+	if metadata.Name != "" {
+		metadataByName[metadata.Name] = &metadata
+	}
+
 	return nil
 }
 

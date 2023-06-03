@@ -36,3 +36,13 @@ devtools:
 	env GOBIN= go install ./cmd/abigen
 	@type "solc" 2> /dev/null || echo 'Please install solc'
 	@type "protoc" 2> /dev/null || echo 'Please install protoc'
+
+.PHONY: concrete-solidity
+
+PC_SOL_DIR = ./concrete/precompiles/sol
+
+concrete-solidity:
+	mkdir -p $(PC_SOL_DIR)/tmp
+	cd $(PC_SOL_DIR) && solcjs --abi -o ./tmp/ *.sol --pretty-json
+	cd $(PC_SOL_DIR)/tmp/ && for file in ./*; do mv "$$file" "../abi/$${file%%_*}.$${file##*.}"; done
+	rm -rf $(PC_SOL_DIR)/tmp
