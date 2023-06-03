@@ -36,7 +36,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed wasm/bin/typical.wasm
+//go:embed wasm/testdata/typical.wasm
 var typicalWasm []byte
 
 var implementations = []struct {

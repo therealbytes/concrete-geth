@@ -21,7 +21,7 @@ import (
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/crypto"
 	"github.com/ethereum/go-ethereum/concrete/lib"
-	"github.com/ethereum/go-ethereum/tinygo/std"
+	tinygo_lib "github.com/ethereum/go-ethereum/tinygo/lib"
 )
 
 // A precompiled used for benchmarking TinyGo WASM.
@@ -32,44 +32,44 @@ type BenchmarkPrecompile struct {
 
 func (pc *BenchmarkPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
 
-	runStart := std.Now()
+	runStart := tinygo_lib.Now()
 
 	var runs int
 	var startTime time.Time
 	var endTime time.Time
 	var timeNs int64
 
-	hash := std.Keccak256(input)
+	hash := tinygo_lib.Keccak256(input)
 
-	// std.Keccak256Hash
+	// tinygo_lib.Keccak256Hash
 
 	runs = 10000
-	startTime = std.Now()
+	startTime = tinygo_lib.Now()
 
 	for i := 0; i < runs; i++ {
-		hash = std.Keccak256(hash)
+		hash = tinygo_lib.Keccak256(hash)
 	}
 
-	endTime = std.Now()
+	endTime = tinygo_lib.Now()
 	timeNs = endTime.Sub(startTime).Nanoseconds()
-	std.Print("std.Keccak256Hash", runs, "op", timeNs, "ns", int(timeNs)/runs, "ns/op")
+	tinygo_lib.Print("tinygo_lib.Keccak256Hash", runs, "op", timeNs, "ns", int(timeNs)/runs, "ns/op")
 
 	// crypto.Keccak256Hash
 
 	runs = 10000
-	startTime = std.Now()
+	startTime = tinygo_lib.Now()
 
 	for i := 0; i < runs; i++ {
 		hash = crypto.Keccak256(hash)
 	}
 
-	endTime = std.Now()
+	endTime = tinygo_lib.Now()
 	timeNs = endTime.Sub(startTime).Nanoseconds()
-	std.Print("crypto.Keccak256Hash", runs, "op", timeNs, "ns", int(timeNs)/runs, "ns/op")
+	tinygo_lib.Print("crypto.Keccak256Hash", runs, "op", timeNs, "ns", int(timeNs)/runs, "ns/op")
 
-	runEnd := std.Now()
+	runEnd := tinygo_lib.Now()
 
-	std.Print("BenchmarkPrecompile.Run", runEnd.Sub(runStart).Microseconds(), "μs")
+	tinygo_lib.Print("BenchmarkPrecompile.Run", runEnd.Sub(runStart).Microseconds(), "μs")
 
 	return nil, nil
 }

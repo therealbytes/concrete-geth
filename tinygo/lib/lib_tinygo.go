@@ -13,32 +13,46 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the concrete library. If not, see <http://www.gnu.org/licenses/>.
 
-//go:build !tinygo
+//go:build tinygo
 
-package std
+package lib
 
 import (
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/concrete/crypto"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
+	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
+	"github.com/ethereum/go-ethereum/tinygo/infra"
 )
+
+//go:wasm-module env
+//export concrete_LogCaller
+func _logCaller(pointer uint64) uint64
+
+var logCaller = func(pointer uint64) uint64 { return _logCaller(pointer) }
 
 func Log(a ...any) {
 	msg := strings.TrimSpace(fmt.Sprintln(a...))
-	log.Info(msg)
+	data := []byte(msg)
+	wasm.Call_BytesArr_Bytes(infra.Memory, infra.Allocator, logCaller, []byte{bridge.Op_Log_Log}, data)
 }
 
 func Print(a ...any) {
 	msg := strings.TrimSpace(fmt.Sprintln(a...))
-	fmt.Println(msg)
+	data := []byte(msg)
+	wasm.Call_BytesArr_Bytes(infra.Memory, infra.Allocator, logCaller, []byte{bridge.Op_Log_Print}, data)
 }
+
+//go:wasm-module env
+//export concrete_TimeCaller
+func _timeCaller(pointer uint64) uint64
 
 func Now() time.Time {
-	return time.Now()
+	return time.Unix(0, int64(_timeCaller(0)))
 }
 
-var Keccak256 = crypto.Keccak256
-var Keccak256Hash = crypto.Keccak256Hash
+var Keccak256 = crypto.ReimplementedKeccak256
+var Keccak256Hash = crypto.ReimplementedKeccak256Hash

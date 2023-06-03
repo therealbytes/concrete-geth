@@ -179,7 +179,7 @@ func TestPutGetReturnWithError(t *testing.T) {
 	testMemoryPutGetReturnWithError(t, memory)
 }
 
-//go:embed bin/blank.wasm
+//go:embed testdata/blank.wasm
 var blankCode []byte
 
 func newTestMemory() (bridge.Memory, bridge.Allocator) {
