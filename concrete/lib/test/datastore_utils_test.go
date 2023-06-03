@@ -67,3 +67,27 @@ func TestCounter(t *testing.T) {
 	r.Equal(ref.Get(), common.BigToHash(counter.Get()))
 	r.Equal(value, counter.Get())
 }
+
+func TestNestedMap(t *testing.T) {
+	var (
+		r         = require.New(t)
+		sdb       = api_test.NewMockStateDB()
+		evm       = api_test.NewMockEVM(sdb)
+		api       = cc_api.New(evm, common.Address{})
+		mapKey    = lib.NewKey("test.nestedMap.v0")
+		mapping   = api.Persistent().NewMap(mapKey)
+		nestedMap = lib.NewNestedMap(mapping)
+	)
+
+	nestedKeys := []common.Hash{{0}, {1}, {2}}
+	valueKey := common.Hash{3}
+	value := common.Hash{4}
+
+	nestedMap.GetNestedMap(nestedKeys...).Set(valueKey, value)
+
+	retValue := nestedMap.GetNestedMap(nestedKeys...).Get(valueKey)
+	r.Equal(value, retValue)
+
+	retValue = nestedMap.GetNested(append(nestedKeys, valueKey)...)
+	r.Equal(value, retValue)
+}
