@@ -17,7 +17,6 @@ package lib
 
 import (
 	"errors"
-	"math/big"
 
 	cc_api "github.com/ethereum/go-ethereum/concrete/api"
 )
@@ -46,28 +45,32 @@ func (pc *BlankPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
 
 var _ cc_api.Precompile = &BlankPrecompile{}
 
-type PrecompileDemux map[uint]cc_api.Precompile
+type PrecompileDemux map[string]cc_api.Precompile
 
-func (d PrecompileDemux) getSelect(input []byte) uint {
-	return uint(new(big.Int).SetBytes(GetData(input, 0, 32)).Uint64())
+func (d PrecompileDemux) getSelection(input []byte) (cc_api.Precompile, []byte, error) {
+	sel := input[:4]
+	input = input[4:]
+	pc, ok := d[string(sel)]
+	if !ok {
+		return nil, nil, errors.New("invalid select value")
+	}
+	return pc, input, nil
 }
 
 func (d PrecompileDemux) MutatesStorage(input []byte) bool {
-	sel := d.getSelect(input)
-	pc, ok := d[sel]
-	if !ok {
+	pc, input, err := d.getSelection(input)
+	if err != nil {
 		return false
 	}
-	return pc.MutatesStorage(input[32:])
+	return pc.MutatesStorage(input)
 }
 
 func (d PrecompileDemux) RequiredGas(input []byte) uint64 {
-	sel := d.getSelect(input)
-	pc, ok := d[sel]
-	if !ok {
+	pc, input, err := d.getSelection(input)
+	if err != nil {
 		return 0
 	}
-	return pc.RequiredGas(input[32:])
+	return pc.RequiredGas(input)
 }
 
 func (d PrecompileDemux) Finalise(api cc_api.API) error {
@@ -89,12 +92,11 @@ func (d PrecompileDemux) Commit(api cc_api.API) error {
 }
 
 func (d PrecompileDemux) Run(api cc_api.API, input []byte) ([]byte, error) {
-	sel := d.getSelect(input)
-	pc, ok := d[sel]
-	if !ok {
-		return nil, errors.New("invalid select value")
+	pc, input, err := d.getSelection(input)
+	if err != nil {
+		return nil, err
 	}
-	return pc.Run(api, input[32:])
+	return pc.Run(api, input)
 }
 
 var _ cc_api.Precompile = &PrecompileDemux{}

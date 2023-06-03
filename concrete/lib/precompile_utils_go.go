@@ -69,30 +69,30 @@ func (p *BlankMethodPrecompile) CallRunWithArgs(run func(concrete cc_api.API, ar
 var _ MethodPrecompile = &BlankMethodPrecompile{}
 
 type PrecompileWithABI struct {
-	ABI             abi.ABI
-	Implementations map[string]cc_api.Precompile
+	ABI     abi.ABI
+	Methods map[string]cc_api.Precompile
 }
 
-func NewPrecompileWithABI(contractABI abi.ABI, implementations map[string]MethodPrecompile) *PrecompileWithABI {
+func NewPrecompileWithABI(contractABI abi.ABI, methods map[string]MethodPrecompile) *PrecompileWithABI {
 	p := &PrecompileWithABI{
-		ABI:             contractABI,
-		Implementations: make(map[string]cc_api.Precompile),
+		ABI:     contractABI,
+		Methods: make(map[string]cc_api.Precompile),
 	}
 	for name, method := range contractABI.Methods {
-		impl, ok := implementations[name]
+		impl, ok := methods[name]
 		if !ok {
 			panic("missing implementation for " + name)
 		}
 		impl.Init(method)
-		p.Implementations[string(method.ID)] = impl
+		p.Methods[string(method.ID)] = impl
 	}
 	return p
 }
 
-func (p *PrecompileWithABI) getImplementation(input []byte) (cc_api.Precompile, []byte, error) {
+func (p *PrecompileWithABI) getMethod(input []byte) (cc_api.Precompile, []byte, error) {
 	id := input[:4]
 	input = input[4:]
-	impl, ok := p.Implementations[string(id)]
+	impl, ok := p.Methods[string(id)]
 	if !ok {
 		return nil, nil, errors.New("invalid method ID")
 	}
@@ -100,7 +100,7 @@ func (p *PrecompileWithABI) getImplementation(input []byte) (cc_api.Precompile, 
 }
 
 func (p *PrecompileWithABI) MutatesStorage(input []byte) bool {
-	pc, input, err := p.getImplementation(input)
+	pc, input, err := p.getMethod(input)
 	if err != nil {
 		return false
 	}
@@ -108,7 +108,7 @@ func (p *PrecompileWithABI) MutatesStorage(input []byte) bool {
 }
 
 func (p *PrecompileWithABI) RequiredGas(input []byte) uint64 {
-	pc, input, err := p.getImplementation(input)
+	pc, input, err := p.getMethod(input)
 	if err != nil {
 		return 0
 	}
@@ -116,7 +116,7 @@ func (p *PrecompileWithABI) RequiredGas(input []byte) uint64 {
 }
 
 func (p *PrecompileWithABI) Finalise(api cc_api.API) error {
-	for _, pc := range p.Implementations {
+	for _, pc := range p.Methods {
 		if err := pc.Finalise(api); err != nil {
 			return err
 		}
@@ -125,7 +125,7 @@ func (p *PrecompileWithABI) Finalise(api cc_api.API) error {
 }
 
 func (p *PrecompileWithABI) Commit(api cc_api.API) error {
-	for _, pc := range p.Implementations {
+	for _, pc := range p.Methods {
 		if err := pc.Commit(api); err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func (p *PrecompileWithABI) Commit(api cc_api.API) error {
 }
 
 func (p *PrecompileWithABI) Run(api cc_api.API, input []byte) ([]byte, error) {
-	pc, input, err := p.getImplementation(input)
+	pc, input, err := p.getMethod(input)
 	if err != nil {
 		return nil, err
 	}
