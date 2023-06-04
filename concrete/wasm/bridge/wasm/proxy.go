@@ -336,9 +336,14 @@ func (p *ProxyEVM) BlockHash(block *big.Int) common.Hash {
 	return common.BytesToHash(retValue)
 }
 
-func (p *ProxyEVM) BlockTimestamp() *big.Int {
+func (p *ProxyEVM) BlockTimestamp() uint64 {
 	retValue := p.call(bridge.Op_EVM_BlockTimestamp.Encode())
-	return new(big.Int).SetBytes(retValue)
+	return bridge.BytesToUint64(retValue)
+}
+
+func (p *ProxyEVM) BlockGasLimit() uint64 {
+	retValue := p.call(bridge.Op_EVM_BlockGasLimit.Encode())
+	return bridge.BytesToUint64(retValue)
 }
 
 func (p *ProxyEVM) BlockNumber() *big.Int {
@@ -348,11 +353,6 @@ func (p *ProxyEVM) BlockNumber() *big.Int {
 
 func (p *ProxyEVM) BlockDifficulty() *big.Int {
 	retValue := p.call(bridge.Op_EVM_BlockDifficulty.Encode())
-	return new(big.Int).SetBytes(retValue)
-}
-
-func (p *ProxyEVM) BlockGasLimit() *big.Int {
-	retValue := p.call(bridge.Op_EVM_BlockGasLimit.Encode())
 	return new(big.Int).SetBytes(retValue)
 }
 
@@ -403,9 +403,14 @@ func (p *CachedProxyEVM) BlockHash(block *big.Int) common.Hash {
 	return hash
 }
 
-func (p *CachedProxyEVM) BlockTimestamp() *big.Int {
+func (p *CachedProxyEVM) BlockTimestamp() uint64 {
 	p.getBlock()
 	return p.block.Timestamp
+}
+
+func (p *CachedProxyEVM) BlockGasLimit() uint64 {
+	p.getBlock()
+	return p.block.GasLimit
 }
 
 func (p *CachedProxyEVM) BlockNumber() *big.Int {
@@ -416,11 +421,6 @@ func (p *CachedProxyEVM) BlockNumber() *big.Int {
 func (p *CachedProxyEVM) BlockDifficulty() *big.Int {
 	p.getBlock()
 	return p.block.Difficulty
-}
-
-func (p *CachedProxyEVM) BlockGasLimit() *big.Int {
-	p.getBlock()
-	return p.block.GasLimit
 }
 
 func (p *CachedProxyEVM) BlockCoinbase() common.Address {

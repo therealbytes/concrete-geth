@@ -558,8 +558,8 @@ func (evm *concreteEVM) BlockHash(block *big.Int) common.Hash {
 	return evm.evm.Context.GetHash(block.Uint64())
 }
 
-func (evm *concreteEVM) BlockTimestamp() *big.Int {
-	return new(big.Int).SetUint64(evm.evm.Context.Time)
+func (evm *concreteEVM) BlockTimestamp() uint64 {
+	return evm.evm.Context.Time
 }
 
 func (evm *concreteEVM) BlockNumber() *big.Int {
@@ -570,8 +570,8 @@ func (evm *concreteEVM) BlockDifficulty() *big.Int {
 	return evm.evm.Context.Difficulty
 }
 
-func (evm *concreteEVM) BlockGasLimit() *big.Int {
-	return new(big.Int).SetUint64(evm.evm.Context.GasLimit)
+func (evm *concreteEVM) BlockGasLimit() uint64 {
+	return evm.evm.Context.GasLimit
 }
 
 func (evm *concreteEVM) BlockCoinbase() common.Address {

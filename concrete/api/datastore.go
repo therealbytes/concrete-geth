@@ -167,9 +167,9 @@ type Array interface {
 	Push(value common.Hash)
 	Pop() common.Hash
 	Swap(i, j int)
-	GetReference(key int) Reference
-	GetMap(key int) Mapping
-	GetArray(key int) Array
+	GetReference(index int) Reference
+	GetMap(index int) Mapping
+	GetArray(index int) Array
 }
 
 type array struct {
@@ -250,24 +250,24 @@ func (a *array) Swap(i, j int) {
 	a.Set(j, iVal)
 }
 
-func (a *array) GetReference(key int) Reference {
+func (a *array) GetReference(index int) Reference {
 	return &reference{
 		ds:  a.ds,
-		key: a.key(key),
+		key: a.key(index),
 	}
 }
 
-func (a *array) GetMap(key int) Mapping {
+func (a *array) GetMap(index int) Mapping {
 	return &mapping{
 		ds: a.ds,
-		id: a.key(key),
+		id: a.key(index),
 	}
 }
 
-func (a *array) GetArray(key int) Array {
+func (a *array) GetArray(index int) Array {
 	return &array{
 		ds: a.ds,
-		id: a.key(key),
+		id: a.key(index),
 	}
 }
 

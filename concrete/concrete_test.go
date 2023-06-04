@@ -22,10 +22,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/lib"
-	"github.com/ethereum/go-ethereum/concrete/lib/precompiles"
-	cc_precompiles "github.com/ethereum/go-ethereum/concrete/precompiles"
+	lib_precompiles "github.com/ethereum/go-ethereum/concrete/lib/precompiles"
+	"github.com/ethereum/go-ethereum/concrete/precompiles"
 	"github.com/ethereum/go-ethereum/concrete/wasm"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -42,12 +42,12 @@ var typicalWasm []byte
 var implementations = []struct {
 	name    string
 	address common.Address
-	pc      cc_api.Precompile
+	pc      api.Precompile
 }{
 	{
 		name:    "Native",
 		address: common.BytesToAddress([]byte{128}),
-		pc:      &precompiles.TypicalPrecompile{},
+		pc:      &lib_precompiles.TypicalPrecompile{},
 	},
 	{
 		name:    "Wasm",
@@ -67,7 +67,7 @@ func TestPrecompile(t *testing.T) {
 		nTx           = 5
 	)
 	for _, impl := range implementations {
-		cc_precompiles.AddPrecompile(impl.address, impl.pc)
+		precompiles.AddPrecompile(impl.address, impl.pc)
 		t.Run(impl.name, func(t *testing.T) {
 			var (
 				gspec = &core.Genesis{
@@ -106,7 +106,7 @@ func TestPrecompile(t *testing.T) {
 			statedb, err := state.New(root, state.NewDatabase(db), nil)
 			r.NoError(err)
 
-			persistent := cc_api.NewCoreDatastore(cc_api.NewPersistentStorage(statedb, pcAddress))
+			persistent := api.NewCoreDatastore(api.NewPersistentStorage(statedb, pcAddress))
 			counter := lib.NewCounter(persistent.NewReference(runCounterKey))
 			set := persistent.NewSet(hashSetKey)
 

@@ -16,7 +16,7 @@
 package precompiles
 
 import (
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/crypto"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	tinygo_lib "github.com/ethereum/go-ethereum/tinygo/lib"
@@ -41,25 +41,25 @@ func (pc *TypicalPrecompile) RequiredGas(input []byte) uint64 {
 	return 10
 }
 
-func (pc *TypicalPrecompile) Finalise(api cc_api.API) error {
+func (pc *TypicalPrecompile) Finalise(API api.API) error {
 	return nil
 }
 
-func (pc *TypicalPrecompile) Commit(api cc_api.API) error {
-	eph := api.Ephemeral()
+func (pc *TypicalPrecompile) Commit(API api.API) error {
+	eph := API.Ephemeral()
 	newHashesSet := eph.NewSet(hashSetKey)
 	arr := newHashesSet.Values()
 	for ii := 0; ii < arr.Length(); ii++ {
 		hash := arr.Get(ii)
 		preimage := eph.GetPreimage(hash)
-		api.StateDB().AddPersistentPreimage(hash, preimage)
+		API.StateDB().AddPersistentPreimage(hash, preimage)
 	}
 	return nil
 }
 
-func (pc *TypicalPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
-	per := api.Persistent()
-	eph := api.Ephemeral()
+func (pc *TypicalPrecompile) Run(API api.API, input []byte) ([]byte, error) {
+	per := API.Persistent()
+	eph := API.Ephemeral()
 
 	counter := lib.NewCounter(per.NewReference(runCounterKey))
 	counter.Inc()

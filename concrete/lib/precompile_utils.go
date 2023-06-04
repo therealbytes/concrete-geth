@@ -18,7 +18,7 @@ package lib
 import (
 	"errors"
 
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 )
 
 type BlankPrecompile struct{}
@@ -31,23 +31,23 @@ func (pc *BlankPrecompile) RequiredGas(input []byte) uint64 {
 	return 0
 }
 
-func (pc *BlankPrecompile) Finalise(api cc_api.API) error {
+func (pc *BlankPrecompile) Finalise(API api.API) error {
 	return nil
 }
 
-func (pc *BlankPrecompile) Commit(api cc_api.API) error {
+func (pc *BlankPrecompile) Commit(API api.API) error {
 	return nil
 }
 
-func (pc *BlankPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
+func (pc *BlankPrecompile) Run(API api.API, input []byte) ([]byte, error) {
 	return []byte{}, nil
 }
 
-var _ cc_api.Precompile = &BlankPrecompile{}
+var _ api.Precompile = &BlankPrecompile{}
 
-type PrecompileDemux map[string]cc_api.Precompile
+type PrecompileDemux map[string]api.Precompile
 
-func (d PrecompileDemux) getSelection(input []byte) (cc_api.Precompile, []byte, error) {
+func (d PrecompileDemux) getSelection(input []byte) (api.Precompile, []byte, error) {
 	sel := input[:4]
 	input = input[4:]
 	pc, ok := d[string(sel)]
@@ -73,30 +73,30 @@ func (d PrecompileDemux) RequiredGas(input []byte) uint64 {
 	return pc.RequiredGas(input)
 }
 
-func (d PrecompileDemux) Finalise(api cc_api.API) error {
+func (d PrecompileDemux) Finalise(API api.API) error {
 	for _, pc := range d {
-		if err := pc.Finalise(api); err != nil {
+		if err := pc.Finalise(API); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (d PrecompileDemux) Commit(api cc_api.API) error {
+func (d PrecompileDemux) Commit(API api.API) error {
 	for _, pc := range d {
-		if err := pc.Commit(api); err != nil {
+		if err := pc.Commit(API); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (d PrecompileDemux) Run(api cc_api.API, input []byte) ([]byte, error) {
+func (d PrecompileDemux) Run(API api.API, input []byte) ([]byte, error) {
 	pc, input, err := d.getSelection(input)
 	if err != nil {
 		return nil, err
 	}
-	return pc.Run(api, input)
+	return pc.Run(API, input)
 }
 
-var _ cc_api.Precompile = &PrecompileDemux{}
+var _ api.Precompile = &PrecompileDemux{}

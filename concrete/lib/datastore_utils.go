@@ -19,7 +19,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/crypto"
 )
 
@@ -30,10 +30,10 @@ func NewKey(name string) common.Hash {
 }
 
 type Counter struct {
-	cc_api.Reference
+	api.Reference
 }
 
-func NewCounter(ref cc_api.Reference) *Counter {
+func NewCounter(ref api.Reference) *Counter {
 	return &Counter{ref}
 }
 
@@ -66,10 +66,10 @@ func (c *Counter) Dec() {
 }
 
 type NestedMap struct {
-	cc_api.Mapping
+	api.Mapping
 }
 
-func NewNestedMap(mapping cc_api.Mapping) *NestedMap {
+func NewNestedMap(mapping api.Mapping) *NestedMap {
 	return &NestedMap{mapping}
 }
 
@@ -79,7 +79,7 @@ func (m *NestedMap) GetNested(keys ...common.Hash) common.Hash {
 	return mapping.Get(keys[lastIdx])
 }
 
-func (m *NestedMap) GetNestedMap(keys ...common.Hash) cc_api.Mapping {
+func (m *NestedMap) GetNestedMap(keys ...common.Hash) api.Mapping {
 	next := m.Mapping
 	for _, key := range keys {
 		next = next.GetMap(key)

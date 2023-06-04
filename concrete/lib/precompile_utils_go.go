@@ -21,11 +21,11 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 )
 
 type MethodPrecompile interface {
-	cc_api.Precompile
+	api.Precompile
 	Init(method abi.Method)
 }
 
@@ -50,12 +50,12 @@ func (p *BlankMethodPrecompile) CallRequiredGasWithArgs(requiredGas func(args []
 	return requiredGas(args)
 }
 
-func (p *BlankMethodPrecompile) CallRunWithArgs(run func(concrete cc_api.API, args []interface{}) ([]interface{}, error), concrete cc_api.API, input []byte) ([]byte, error) {
+func (p *BlankMethodPrecompile) CallRunWithArgs(run func(API api.API, args []interface{}) ([]interface{}, error), API api.API, input []byte) ([]byte, error) {
 	args, err := p.Method.Inputs.UnpackValues(input)
 	if err != nil {
 		return nil, errors.New("error unpacking arguments: " + err.Error())
 	}
-	returns, err := run(concrete, args)
+	returns, err := run(API, args)
 	if err != nil {
 		return nil, err
 	}
@@ -70,13 +70,13 @@ var _ MethodPrecompile = &BlankMethodPrecompile{}
 
 type PrecompileWithABI struct {
 	ABI     abi.ABI
-	Methods map[string]cc_api.Precompile
+	Methods map[string]api.Precompile
 }
 
 func NewPrecompileWithABI(contractABI abi.ABI, methods map[string]MethodPrecompile) *PrecompileWithABI {
 	p := &PrecompileWithABI{
 		ABI:     contractABI,
-		Methods: make(map[string]cc_api.Precompile),
+		Methods: make(map[string]api.Precompile),
 	}
 	for name, method := range contractABI.Methods {
 		impl, ok := methods[name]
@@ -89,7 +89,7 @@ func NewPrecompileWithABI(contractABI abi.ABI, methods map[string]MethodPrecompi
 	return p
 }
 
-func (p *PrecompileWithABI) getMethod(input []byte) (cc_api.Precompile, []byte, error) {
+func (p *PrecompileWithABI) getMethod(input []byte) (api.Precompile, []byte, error) {
 	id := input[:4]
 	input = input[4:]
 	impl, ok := p.Methods[string(id)]
@@ -115,30 +115,30 @@ func (p *PrecompileWithABI) RequiredGas(input []byte) uint64 {
 	return pc.RequiredGas(input)
 }
 
-func (p *PrecompileWithABI) Finalise(api cc_api.API) error {
+func (p *PrecompileWithABI) Finalise(API api.API) error {
 	for _, pc := range p.Methods {
-		if err := pc.Finalise(api); err != nil {
+		if err := pc.Finalise(API); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *PrecompileWithABI) Commit(api cc_api.API) error {
+func (p *PrecompileWithABI) Commit(API api.API) error {
 	for _, pc := range p.Methods {
-		if err := pc.Commit(api); err != nil {
+		if err := pc.Commit(API); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *PrecompileWithABI) Run(api cc_api.API, input []byte) ([]byte, error) {
+func (p *PrecompileWithABI) Run(API api.API, input []byte) ([]byte, error) {
 	pc, input, err := p.getMethod(input)
 	if err != nil {
 		return nil, err
 	}
-	return pc.Run(api, input)
+	return pc.Run(API, input)
 }
 
-var _ cc_api.Precompile = &PrecompileWithABI{}
+var _ api.Precompile = &PrecompileWithABI{}

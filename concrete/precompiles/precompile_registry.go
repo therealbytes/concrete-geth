@@ -68,8 +68,8 @@ func (p *getFramework) RequiredGas(input []byte) uint64 {
 	return GetFrameworkGas
 }
 
-func (p *getFramework) Run(concrete api.API, input []byte) ([]byte, error) {
-	return p.CallRunWithArgs(func(concrete api.API, args []interface{}) ([]interface{}, error) {
+func (p *getFramework) Run(API api.API, input []byte) ([]byte, error) {
+	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		metadata := struct {
 			Name    string `json:"name"`
 			Version string `json:"version"`
@@ -80,7 +80,7 @@ func (p *getFramework) Run(concrete api.API, input []byte) ([]byte, error) {
 			"https://github.com/therealbytes/concrete-geth",
 		}
 		return []interface{}{metadata}, nil
-	}, concrete, input)
+	}, API, input)
 }
 
 type getPrecompile struct {
@@ -91,14 +91,14 @@ func (p *getPrecompile) RequiredGas(input []byte) uint64 {
 	return GetPrecompileGas
 }
 
-func (p *getPrecompile) Run(concrete api.API, input []byte) ([]byte, error) {
-	return p.CallRunWithArgs(func(concrete api.API, args []interface{}) ([]interface{}, error) {
+func (p *getPrecompile) Run(API api.API, input []byte) ([]byte, error) {
+	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		address := common.Address(args[0].(common.Address))
 		if metadata, ok := metadataByAddress[address]; ok {
 			return []interface{}{&metadata}, nil
 		}
 		return []interface{}{PrecompileMetadata{}}, nil
-	}, concrete, input)
+	}, API, input)
 }
 
 type getPrecompileByName struct {
@@ -109,14 +109,14 @@ func (p *getPrecompileByName) RequiredGas(input []byte) uint64 {
 	return GetPrecompileByNameGas
 }
 
-func (p *getPrecompileByName) Run(concrete api.API, input []byte) ([]byte, error) {
-	return p.CallRunWithArgs(func(concrete api.API, args []interface{}) ([]interface{}, error) {
+func (p *getPrecompileByName) Run(API api.API, input []byte) ([]byte, error) {
+	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		name := args[0].(string)
 		if metadata, ok := metadataByName[name]; ok {
 			return []interface{}{metadata.Addr}, nil
 		}
 		return []interface{}{common.Address{}}, nil
-	}, concrete, input)
+	}, API, input)
 }
 
 type getPrecompiledAddresses struct {
@@ -127,10 +127,10 @@ func (p *getPrecompiledAddresses) RequiredGas(input []byte) uint64 {
 	return GetPrecompiledAddressesGas
 }
 
-func (p *getPrecompiledAddresses) Run(concrete api.API, input []byte) ([]byte, error) {
-	return p.CallRunWithArgs(func(concrete api.API, args []interface{}) ([]interface{}, error) {
+func (p *getPrecompiledAddresses) Run(API api.API, input []byte) ([]byte, error) {
+	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		return []interface{}{precompiledAddresses}, nil
-	}, concrete, input)
+	}, API, input)
 }
 
 type getPrecompiles struct {

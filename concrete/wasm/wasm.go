@@ -19,7 +19,7 @@ import (
 	"context"
 	"sync"
 
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/host"
 	"github.com/tetratelabs/wazero"
@@ -44,7 +44,7 @@ var (
 	WASM_TIME_CALLER      = "concrete_TimeCaller"
 )
 
-func NewWasmPrecompile(code []byte) cc_api.Precompile {
+func NewWasmPrecompile(code []byte) api.Precompile {
 	pc := newWasmPrecompile(code)
 	if pc.isPure() {
 		return &statelessWasmPrecompile{pc}
@@ -103,7 +103,7 @@ type wasmPrecompile struct {
 	mutex             sync.Mutex
 	memory            bridge.Memory
 	allocator         bridge.Allocator
-	api               cc_api.API
+	API               api.API
 	expIsPure         wz_api.Function
 	expMutatesStorage wz_api.Function
 	expRequiredGas    wz_api.Function
@@ -116,7 +116,7 @@ func newWasmPrecompile(code []byte) *wasmPrecompile {
 	pc := &wasmPrecompile{}
 
 	hostConfig := newHostConfig()
-	apiGetter := func() cc_api.API { return pc.api }
+	apiGetter := func() api.API { return pc.API }
 	hostConfig.evm = host.NewEVMHostFunc(apiGetter)
 	hostConfig.statedb = host.NewStateDBHostFunc(apiGetter)
 	hostConfig.address = host.NewAddressHostFunc(apiGetter)
@@ -179,13 +179,13 @@ func (p *wasmPrecompile) call_Bytes_BytesErr(expFunc wz_api.Function, input []by
 	return retValues[0], retErr
 }
 
-func (p *wasmPrecompile) before(api cc_api.API) {
+func (p *wasmPrecompile) before(api api.API) {
 	p.mutex.Lock()
-	p.api = api
+	p.API = api
 }
 
-func (p *wasmPrecompile) after(api cc_api.API) {
-	p.api = nil
+func (p *wasmPrecompile) after(api api.API) {
+	p.API = nil
 	p.allocator.Prune()
 	p.mutex.Unlock()
 }
@@ -208,25 +208,25 @@ func (p *wasmPrecompile) MutatesStorage(input []byte) bool {
 	return p.call_Bytes_Uint64(p.expMutatesStorage, input) != 0
 }
 
-func (p *wasmPrecompile) Finalise(api cc_api.API) error {
-	p.before(api)
-	defer p.after(api)
+func (p *wasmPrecompile) Finalise(API api.API) error {
+	p.before(API)
+	defer p.after(API)
 	return p.call__Err(p.expFinalise)
 }
 
-func (p *wasmPrecompile) Commit(api cc_api.API) error {
-	p.before(api)
-	defer p.after(api)
+func (p *wasmPrecompile) Commit(API api.API) error {
+	p.before(API)
+	defer p.after(API)
 	return p.call__Err(p.expCommit)
 }
 
-func (p *wasmPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
-	p.before(api)
-	defer p.after(api)
+func (p *wasmPrecompile) Run(API api.API, input []byte) ([]byte, error) {
+	p.before(API)
+	defer p.after(API)
 	return p.call_Bytes_BytesErr(p.expRun, input)
 }
 
-var _ cc_api.Precompile = (*wasmPrecompile)(nil)
+var _ api.Precompile = (*wasmPrecompile)(nil)
 
 type statelessWasmPrecompile struct {
 	*wasmPrecompile
@@ -236,10 +236,10 @@ func (p *statelessWasmPrecompile) MutatesStorage(input []byte) bool {
 	return false
 }
 
-func (p *statelessWasmPrecompile) Finalise(api cc_api.API) error {
+func (p *statelessWasmPrecompile) Finalise(API api.API) error {
 	return nil
 }
 
-func (p *statelessWasmPrecompile) Commit(api cc_api.API) error {
+func (p *statelessWasmPrecompile) Commit(API api.API) error {
 	return nil
 }

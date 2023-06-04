@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/concrete/lib/precompiles"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -38,7 +38,7 @@ var benchmarkCode []byte
 
 var typicalImplementations = []struct {
 	name string
-	pc   cc_api.Precompile
+	pc   api.Precompile
 }{
 	{"Native", &precompiles.TypicalPrecompile{}},
 	{"Wasm", NewWasmPrecompile(typicalCode)},
@@ -61,12 +61,12 @@ func TestPrecompile(t *testing.T) {
 					var (
 						statedb = newTestStateDB()
 						evm     = newTestEVM(statedb)
-						api     = cc_api.New(evm, common.Address{})
-						counter = lib.NewCounter(api.Persistent().NewReference(runCounterKey))
+						API     = api.New(evm, common.Address{})
+						counter = lib.NewCounter(API.Persistent().NewReference(runCounterKey))
 					)
 					r.Equal(uint64(0), counter.Get().Uint64())
 					for jj := 0; jj < iterations; jj++ {
-						_, err := impl.pc.Run(api, nil)
+						_, err := impl.pc.Run(API, nil)
 						r.NoError(err)
 						time.Sleep(time.Duration(rand.Intn(10)) * time.Microsecond)
 					}
@@ -82,14 +82,14 @@ func BenchmarkPrecompile(b *testing.B) {
 	var (
 		statedb  = newTestStateDB()
 		evm      = newTestEVM(statedb)
-		api      = cc_api.New(evm, common.Address{})
+		API      = api.New(evm, common.Address{})
 		preimage = crypto.Keccak256([]byte("test.data"))
 	)
 	for _, impl := range typicalImplementations {
 		b.Run(impl.name, func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := impl.pc.Run(api, preimage)
+				_, err := impl.pc.Run(API, preimage)
 				require.NoError(b, err)
 			}
 		})
@@ -98,7 +98,7 @@ func BenchmarkPrecompile(b *testing.B) {
 
 var benchmarkImplementations = []struct {
 	name string
-	pc   cc_api.Precompile
+	pc   api.Precompile
 }{
 	{"Native", &precompiles.BenchmarkPrecompile{}},
 	{"Wasm", NewWasmPrecompile(benchmarkCode)},
@@ -108,11 +108,11 @@ func TestRunBenchmarkPrecompile(t *testing.T) {
 	var (
 		statedb = newTestStateDB()
 		evm     = newTestEVM(statedb)
-		api     = cc_api.New(evm, common.Address{})
+		API     = api.New(evm, common.Address{})
 	)
 	for _, impl := range benchmarkImplementations {
 		t.Run(impl.name, func(t *testing.T) {
-			_, err := impl.pc.Run(api, nil)
+			_, err := impl.pc.Run(API, nil)
 			require.NoError(t, err)
 		})
 	}

@@ -21,7 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
-	cc_api_test "github.com/ethereum/go-ethereum/concrete/api/test"
+	api_test "github.com/ethereum/go-ethereum/concrete/api/test"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
@@ -29,7 +29,7 @@ import (
 
 type preimageRegistryPCWrapper struct {
 	*lib.PrecompileWithABI
-	concrete api.API
+	API api.API
 }
 
 func (p *preimageRegistryPCWrapper) addPreimage(preimage []byte) (common.Hash, error) {
@@ -37,7 +37,7 @@ func (p *preimageRegistryPCWrapper) addPreimage(preimage []byte) (common.Hash, e
 	if err != nil {
 		return common.Hash{}, err
 	}
-	output, err := p.Run(p.concrete, input)
+	output, err := p.Run(p.API, input)
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -54,7 +54,7 @@ func (p *preimageRegistryPCWrapper) hasPreimage(hash common.Hash) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	output, err := p.Run(p.concrete, input)
+	output, err := p.Run(p.API, input)
 	if err != nil {
 		return false, err
 	}
@@ -71,7 +71,7 @@ func (p *preimageRegistryPCWrapper) getPreimageSize(hash common.Hash) (uint64, e
 	if err != nil {
 		return 0, err
 	}
-	output, err := p.Run(p.concrete, input)
+	output, err := p.Run(p.API, input)
 	if err != nil {
 		return 0, err
 	}
@@ -89,7 +89,7 @@ func (p *preimageRegistryPCWrapper) getPreimage(size uint64, hash common.Hash) (
 	if err != nil {
 		return nil, err
 	}
-	output, err := p.Run(p.concrete, input)
+	output, err := p.Run(p.API, input)
 	if err != nil {
 		return nil, err
 	}
@@ -106,9 +106,9 @@ func TestPreimageRegistry(t *testing.T) {
 		r        = require.New(t)
 		address  = api.PreimageRegistryAddress
 		pc       = precompiles[address].(*lib.PrecompileWithABI)
-		evm      = cc_api_test.NewMockEVM(cc_api_test.NewMockStateDB())
-		concrete = api.New(evm, address)
-		wpc      = &preimageRegistryPCWrapper{PrecompileWithABI: pc, concrete: concrete}
+		evm      = api_test.NewMockEVM(api_test.NewMockStateDB())
+		API      = api.New(evm, address)
+		wpc      = &preimageRegistryPCWrapper{PrecompileWithABI: pc, API: API}
 		preimage = []byte("test.data")
 		hash     = crypto.Keccak256Hash(preimage)
 	)
@@ -126,7 +126,7 @@ func TestPreimageRegistry(t *testing.T) {
 
 	// retHash, err := wpc.addPreimage(preimage)
 	// r.NoError(err)
-	retHash := concrete.Persistent().AddPreimage(preimage)
+	retHash := API.Persistent().AddPreimage(preimage)
 	r.Equal(hash, retHash)
 
 	has, err = wpc.hasPreimage(hash)
@@ -149,9 +149,9 @@ func TestBigPreimageRegistry(t *testing.T) {
 		leafSize = 64
 		address  = api.BigPreimageRegistryAddress
 		pc       = precompiles[address].(*lib.PrecompileWithABI)
-		evm      = cc_api_test.NewMockEVM(cc_api_test.NewMockStateDB())
-		concrete = api.New(evm, address)
-		wpc      = &preimageRegistryPCWrapper{PrecompileWithABI: pc, concrete: concrete}
+		evm      = api_test.NewMockEVM(api_test.NewMockStateDB())
+		API      = api.New(evm, address)
+		wpc      = &preimageRegistryPCWrapper{PrecompileWithABI: pc, API: API}
 		preimage = []byte("test.data")
 	)
 
@@ -170,7 +170,7 @@ func TestBigPreimageRegistry(t *testing.T) {
 
 	// retHash, err := wpc.addPreimage(preimage)
 	// r.NoError(err)
-	retHash := api.NewPersistentBigPreimageStore(concrete, radix, leafSize).AddPreimage(preimage)
+	retHash := api.NewPersistentBigPreimageStore(API, radix, leafSize).AddPreimage(preimage)
 	// r.Equal(hash, retHash)
 
 	has, err = wpc.hasPreimage(retHash)

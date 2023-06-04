@@ -19,8 +19,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
-	cc_api_test "github.com/ethereum/go-ethereum/concrete/api/test"
+	"github.com/ethereum/go-ethereum/concrete/api"
+	api_test "github.com/ethereum/go-ethereum/concrete/api/test"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/stretchr/testify/require"
 )
@@ -66,19 +66,19 @@ func (p *testPrecompile) MutatesStorage(input []byte) bool {
 	return MUTATES_STORAGE
 }
 
-func (p *testPrecompile) Run(api cc_api.API, input []byte) (output []byte, err error) {
-	api.StateDB().SetPersistentState(api.Address(), common.BytesToHash([]byte{1}), common.BytesToHash([]byte{1}))
+func (p *testPrecompile) Run(API api.API, input []byte) (output []byte, err error) {
+	API.StateDB().SetPersistentState(API.Address(), common.BytesToHash([]byte{1}), common.BytesToHash([]byte{1}))
 	return nil, nil
 }
 
-var _ cc_api.Precompile = (*testPrecompile)(nil)
+var _ api.Precompile = (*testPrecompile)(nil)
 
 func TestRunPrecompile(t *testing.T) {
 	var (
 		r     = require.New(t)
 		addr  = common.BytesToAddress([]byte{1})
 		pc    = &testPrecompile{}
-		evm   = cc_api_test.NewMockEVM(cc_api_test.NewMockStateDB())
+		evm   = api_test.NewMockEVM(api_test.NewMockStateDB())
 		input = []byte{0}
 	)
 	var (

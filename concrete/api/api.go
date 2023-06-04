@@ -89,10 +89,10 @@ var _ StateDB = &CommitSafeStateDB{}
 type EVM interface {
 	StateDB() StateDB
 	BlockHash(block *big.Int) common.Hash
-	BlockTimestamp() *big.Int
+	BlockTimestamp() uint64
+	BlockGasLimit() uint64
 	BlockNumber() *big.Int
 	BlockDifficulty() *big.Int
-	BlockGasLimit() *big.Int
 	BlockCoinbase() common.Address
 }
 
@@ -268,10 +268,10 @@ func (s *EphemeralStorage) GetPreimageSize(hash common.Hash) int {
 var _ Storage = (*EphemeralStorage)(nil)
 
 type Block interface {
-	Timestamp() *big.Int
+	Timestamp() uint64
+	GasLimit() uint64
 	Number() *big.Int
 	Difficulty() *big.Int
-	GasLimit() *big.Int
 	Coinbase() common.Address
 }
 
@@ -279,10 +279,10 @@ type FullBlock struct {
 	evm EVM
 }
 
-func (b *FullBlock) Timestamp() *big.Int      { return b.evm.BlockTimestamp() }
+func (b *FullBlock) Timestamp() uint64        { return b.evm.BlockTimestamp() }
+func (b *FullBlock) GasLimit() uint64         { return b.evm.BlockGasLimit() }
 func (b *FullBlock) Number() *big.Int         { return b.evm.BlockNumber() }
 func (b *FullBlock) Difficulty() *big.Int     { return b.evm.BlockDifficulty() }
-func (b *FullBlock) GasLimit() *big.Int       { return b.evm.BlockGasLimit() }
 func (b *FullBlock) Coinbase() common.Address { return b.evm.BlockCoinbase() }
 
 var _ Block = (*FullBlock)(nil)

@@ -20,15 +20,15 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
-	cc_api_test "github.com/ethereum/go-ethereum/concrete/api/test"
+	"github.com/ethereum/go-ethereum/concrete/api"
+	api_test "github.com/ethereum/go-ethereum/concrete/api/test"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/host"
 	"github.com/ethereum/go-ethereum/concrete/wasm/bridge/wasm"
 	"github.com/stretchr/testify/require"
 )
 
-func newStateDBHostFunc(memory bridge.Memory, db cc_api.StateDB) wasm.HostFuncCaller {
+func newStateDBHostFunc(memory bridge.Memory, db api.StateDB) wasm.HostFuncCaller {
 	return func(pointer uint64) uint64 {
 		args := bridge.GetArgs(memory, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
@@ -39,7 +39,7 @@ func newStateDBHostFunc(memory bridge.Memory, db cc_api.StateDB) wasm.HostFuncCa
 	}
 }
 
-func newProxyStateDB(db cc_api.StateDB) cc_api.StateDB {
+func newProxyStateDB(db api.StateDB) api.StateDB {
 	memory := newMockMemory()
 	alloc := newMockAllocator()
 	caller := newStateDBHostFunc(memory, db)
@@ -47,17 +47,17 @@ func newProxyStateDB(db cc_api.StateDB) cc_api.StateDB {
 }
 
 type readWriteStorage struct {
-	read, write cc_api.Storage
+	read, write api.Storage
 }
 
-func newReadWriteStorage(read, write cc_api.Storage) cc_api.Storage {
+func newReadWriteStorage(read, write api.Storage) api.Storage {
 	return &readWriteStorage{
 		read:  read,
 		write: write,
 	}
 }
 
-func (s *readWriteStorage) StateDB() cc_api.StateDB {
+func (s *readWriteStorage) StateDB() api.StateDB {
 	panic("not implemented")
 }
 
@@ -94,49 +94,49 @@ func TestStateDBBProxy(t *testing.T) {
 		address       = common.HexToAddress("0x01")
 		statedb       = newTestStateDB()
 		proxy         = newProxyStateDB(statedb)
-		stateApi      = cc_api.NewStateAPI(statedb, address)
-		proxyStateApi = cc_api.NewStateAPI(proxy, address)
+		stateAPI      = api.NewStateAPI(statedb, address)
+		proxyStateAPI = api.NewStateAPI(proxy, address)
 
-		persistent      = stateApi.Persistent()
-		proxyPersistent = proxyStateApi.Persistent()
-		ephemeral       = stateApi.Ephemeral()
-		proxyEphemeral  = proxyStateApi.Ephemeral()
+		persistent      = stateAPI.Persistent()
+		proxyPersistent = proxyStateAPI.Persistent()
+		ephemeral       = stateAPI.Ephemeral()
+		proxyEphemeral  = proxyStateAPI.Ephemeral()
 	)
 
 	// Test persistent methods
-	cc_api_test.TestStorage(t, newReadWriteStorage(persistent, proxyPersistent))
-	cc_api_test.TestStorage(t, newReadWriteStorage(proxyPersistent, persistent))
+	api_test.TestStorage(t, newReadWriteStorage(persistent, proxyPersistent))
+	api_test.TestStorage(t, newReadWriteStorage(proxyPersistent, persistent))
 
 	// Test ephemeral methods
-	cc_api_test.TestStorage(t, newReadWriteStorage(ephemeral, proxyEphemeral))
-	cc_api_test.TestStorage(t, newReadWriteStorage(proxyEphemeral, ephemeral))
+	api_test.TestStorage(t, newReadWriteStorage(ephemeral, proxyEphemeral))
+	api_test.TestStorage(t, newReadWriteStorage(proxyEphemeral, ephemeral))
 
 	// Fuzz proxy
-	cc_api_test.FuzzStorage(t, proxyPersistent)
-	cc_api_test.FuzzStorage(t, proxyEphemeral)
+	api_test.FuzzStorage(t, proxyPersistent)
+	api_test.FuzzStorage(t, proxyEphemeral)
 }
 
 type mockEVM struct {
-	db cc_api.StateDB
+	db api.StateDB
 }
 
-func newEVMStub(db cc_api.StateDB) cc_api.EVM {
+func newEVMStub(db api.StateDB) api.EVM {
 	return &mockEVM{
 		db: db,
 	}
 }
 
-func (m *mockEVM) StateDB() cc_api.StateDB              { return m.db }
+func (m *mockEVM) StateDB() api.StateDB                 { return m.db }
 func (m *mockEVM) BlockHash(block *big.Int) common.Hash { return common.Hash{2} }
-func (m *mockEVM) BlockTimestamp() *big.Int             { return common.Big2 }
+func (m *mockEVM) BlockTimestamp() uint64               { return 0 }
+func (m *mockEVM) BlockGasLimit() uint64                { return 0 }
 func (m *mockEVM) BlockNumber() *big.Int                { return common.Big2 }
 func (m *mockEVM) BlockDifficulty() *big.Int            { return common.Big2 }
-func (m *mockEVM) BlockGasLimit() *big.Int              { return common.Big2 }
 func (m *mockEVM) BlockCoinbase() common.Address        { return common.Address{2} }
 
-var _ cc_api.EVM = &mockEVM{}
+var _ api.EVM = &mockEVM{}
 
-func newEVMHostFunc(memory bridge.Memory, evm cc_api.EVM) wasm.HostFuncCaller {
+func newEVMHostFunc(memory bridge.Memory, evm api.EVM) wasm.HostFuncCaller {
 	return func(pointer uint64) uint64 {
 		args := bridge.GetArgs(memory, bridge.MemPointer(pointer))
 		var opcode bridge.OpCode
@@ -147,7 +147,7 @@ func newEVMHostFunc(memory bridge.Memory, evm cc_api.EVM) wasm.HostFuncCaller {
 	}
 }
 
-func newProxyEVM(evm cc_api.EVM) cc_api.EVM {
+func newProxyEVM(evm api.EVM) api.EVM {
 	memory := newMockMemory()
 	alloc := newMockAllocator()
 	stateDBCaller := newStateDBHostFunc(memory, evm.StateDB())
@@ -157,7 +157,7 @@ func newProxyEVM(evm cc_api.EVM) cc_api.EVM {
 
 func TestEVMProxy(t *testing.T) {
 	var (
-		statedb = cc_api_test.NewMockStateDB()
+		statedb = api_test.NewMockStateDB()
 		evm     = newEVMStub(statedb)
 		proxy   = newProxyEVM(evm)
 	)
@@ -172,10 +172,10 @@ func TestEVMProxy(t *testing.T) {
 
 func TestBlockEncodeDecode(t *testing.T) {
 	block1 := bridge.BlockData{
-		Timestamp:  common.Big1,
+		Timestamp:  0,
+		GasLimit:   0,
 		Number:     common.Big2,
 		Difficulty: common.Big3,
-		GasLimit:   common.Big32,
 		Coinbase:   common.Address{1},
 	}
 	encoded := block1.Encode()

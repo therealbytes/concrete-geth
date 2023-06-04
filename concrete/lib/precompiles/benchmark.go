@@ -18,7 +18,7 @@ package precompiles
 import (
 	"time"
 
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/crypto"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	tinygo_lib "github.com/ethereum/go-ethereum/tinygo/lib"
@@ -30,7 +30,7 @@ type BenchmarkPrecompile struct {
 	lib.BlankPrecompile
 }
 
-func (pc *BenchmarkPrecompile) Run(api cc_api.API, input []byte) ([]byte, error) {
+func (pc *BenchmarkPrecompile) Run(API api.API, input []byte) ([]byte, error) {
 
 	runStart := tinygo_lib.Now()
 

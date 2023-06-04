@@ -56,8 +56,8 @@ func init() {
 
 	preimageRegistry := NewPreimageRegistry(
 		ABI,
-		func(concrete api.API) api.PreimageStore {
-			return concrete.Persistent()
+		func(API api.API) api.PreimageStore {
+			return API.Persistent()
 		},
 		preimageRegistryGasTable{
 			addPreimageGas:        10,
@@ -73,8 +73,8 @@ func init() {
 
 	bigPreimageRegistry := NewPreimageRegistry(
 		ABI,
-		func(concrete api.API) api.PreimageStore {
-			return api.NewPersistentBigPreimageStore(concrete, -1, -1)
+		func(API api.API) api.PreimageStore {
+			return api.NewPersistentBigPreimageStore(API, -1, -1)
 		},
 		preimageRegistryGasTable{
 			addPreimageGas:        10,
@@ -136,15 +136,15 @@ func (p *addPreimage) RequiredGas(input []byte) uint64 {
 	return p.gasTable.addPreimageGas + p.gasTable.addPreimagePerByteGas*uint64(len(input)-64)
 }
 
-func (p *addPreimage) Run(concrete api.API, input []byte) ([]byte, error) {
+func (p *addPreimage) Run(API api.API, input []byte) ([]byte, error) {
 	if !p.enabled {
 		return nil, errors.New("writes to registry are disabled")
 	}
-	return p.CallRunWithArgs(func(concrete api.API, args []interface{}) ([]interface{}, error) {
+	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		preimage := args[0].([]byte)
-		hash := p.getStore(concrete).AddPreimage(preimage)
+		hash := p.getStore(API).AddPreimage(preimage)
 		return []interface{}{hash}, nil
-	}, concrete, input)
+	}, API, input)
 }
 
 type hasPreimage struct {
@@ -157,12 +157,12 @@ func (p *hasPreimage) RequiredGas(input []byte) uint64 {
 	return p.gasTable.hasPreimageGas
 }
 
-func (p *hasPreimage) Run(concrete api.API, input []byte) ([]byte, error) {
-	return p.CallRunWithArgs(func(concrete api.API, args []interface{}) ([]interface{}, error) {
+func (p *hasPreimage) Run(API api.API, input []byte) ([]byte, error) {
+	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		hash := common.Hash(args[0].([32]byte))
-		has := p.getStore(concrete).HasPreimage(hash)
+		has := p.getStore(API).HasPreimage(hash)
 		return []interface{}{has}, nil
-	}, concrete, input)
+	}, API, input)
 }
 
 type getPreimageSize struct {
@@ -175,15 +175,15 @@ func (p *getPreimageSize) RequiredGas(input []byte) uint64 {
 	return p.gasTable.getPreimageSizeGas
 }
 
-func (p *getPreimageSize) Run(concrete api.API, input []byte) ([]byte, error) {
-	return p.CallRunWithArgs(func(concrete api.API, args []interface{}) ([]interface{}, error) {
+func (p *getPreimageSize) Run(API api.API, input []byte) ([]byte, error) {
+	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		hash := common.Hash(args[0].([32]byte))
-		size := p.getStore(concrete).GetPreimageSize(hash)
+		size := p.getStore(API).GetPreimageSize(hash)
 		if size < 0 {
 			size = 0
 		}
 		return []interface{}{big.NewInt(int64(size))}, nil
-	}, concrete, input)
+	}, API, input)
 }
 
 type getPreimage struct {
@@ -199,11 +199,11 @@ func (p *getPreimage) RequiredGas(input []byte) uint64 {
 	}, input)
 }
 
-func (p *getPreimage) Run(concrete api.API, input []byte) ([]byte, error) {
-	return p.CallRunWithArgs(func(concrete api.API, args []interface{}) ([]interface{}, error) {
+func (p *getPreimage) Run(API api.API, input []byte) ([]byte, error) {
+	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		size := int(args[0].(*big.Int).Int64())
 		hash := common.Hash(args[1].([32]byte))
-		store := p.getStore(concrete)
+		store := p.getStore(API)
 		if !store.HasPreimage(hash) {
 			return []interface{}{[]byte{}}, errors.New("preimage not found")
 		}
@@ -213,5 +213,5 @@ func (p *getPreimage) Run(concrete api.API, input []byte) ([]byte, error) {
 		}
 		preimage := store.GetPreimage(hash)
 		return []interface{}{preimage}, nil
-	}, concrete, input)
+	}, API, input)
 }

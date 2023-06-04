@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	api_test "github.com/ethereum/go-ethereum/concrete/api/test"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/stretchr/testify/require"
@@ -31,9 +31,9 @@ func TestCounter(t *testing.T) {
 		r       = require.New(t)
 		sdb     = api_test.NewMockStateDB()
 		evm     = api_test.NewMockEVM(sdb)
-		api     = cc_api.New(evm, common.Address{})
+		API     = api.New(evm, common.Address{})
 		key     = lib.NewKey("test.counter.v0")
-		ref     = api.Persistent().NewReference(key)
+		ref     = API.Persistent().NewReference(key)
 		counter = lib.NewCounter(ref)
 	)
 
@@ -73,9 +73,9 @@ func TestNestedMap(t *testing.T) {
 		r         = require.New(t)
 		sdb       = api_test.NewMockStateDB()
 		evm       = api_test.NewMockEVM(sdb)
-		api       = cc_api.New(evm, common.Address{})
+		API       = api.New(evm, common.Address{})
 		mapKey    = lib.NewKey("test.nestedMap.v0")
-		mapping   = api.Persistent().NewMap(mapKey)
+		mapping   = API.Persistent().NewMap(mapKey)
 		nestedMap = lib.NewNestedMap(mapping)
 	)
 

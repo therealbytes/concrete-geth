@@ -20,19 +20,19 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/stretchr/testify/require"
 )
 
 var statedbs = []struct {
 	name        string
-	constructor func() cc_api.StateDB
+	constructor func() api.StateDB
 	readOnly    bool
 	commitSafe  bool
 }{
 	{
 		name: "StateDB",
-		constructor: func() cc_api.StateDB {
+		constructor: func() api.StateDB {
 			return NewMockStateDB()
 		},
 		readOnly:   false,
@@ -40,16 +40,16 @@ var statedbs = []struct {
 	},
 	{
 		name: "ReadOnlyStateDB",
-		constructor: func() cc_api.StateDB {
-			return cc_api.NewReadOnlyStateDB(NewMockStateDB())
+		constructor: func() api.StateDB {
+			return api.NewReadOnlyStateDB(NewMockStateDB())
 		},
 		readOnly:   true,
 		commitSafe: true,
 	},
 	{
 		name: "CommitSafeStateDB",
-		constructor: func() cc_api.StateDB {
-			return cc_api.NewCommitSafeStateDB(NewMockStateDB())
+		constructor: func() api.StateDB {
+			return api.NewCommitSafeStateDB(NewMockStateDB())
 		},
 		readOnly:   false,
 		commitSafe: true,
@@ -58,13 +58,13 @@ var statedbs = []struct {
 
 var statedbMethods = []struct {
 	name       string
-	call       func(statedb cc_api.StateDB)
+	call       func(statedb api.StateDB)
 	readOnly   bool
 	commitSafe bool
 }{
 	{
 		name: "SetPersistentState",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.SetPersistentState(common.Address{}, common.Hash{}, common.Hash{})
 		},
 		readOnly:   false,
@@ -72,7 +72,7 @@ var statedbMethods = []struct {
 	},
 	{
 		name: "SetEphemeralState",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.SetEphemeralState(common.Address{}, common.Hash{}, common.Hash{})
 		},
 		readOnly:   false,
@@ -80,7 +80,7 @@ var statedbMethods = []struct {
 	},
 	{
 		name: "AddPersistentPreimage",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.AddPersistentPreimage(common.Hash{}, []byte{})
 		},
 		readOnly:   false,
@@ -88,7 +88,7 @@ var statedbMethods = []struct {
 	},
 	{
 		name: "AddEphemeralPreimage",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.AddEphemeralPreimage(common.Hash{}, []byte{})
 		},
 		readOnly:   false,
@@ -96,7 +96,7 @@ var statedbMethods = []struct {
 	},
 	{
 		name: "GetPersistentState",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.GetPersistentState(common.Address{}, common.Hash{})
 		},
 		readOnly:   true,
@@ -104,7 +104,7 @@ var statedbMethods = []struct {
 	},
 	{
 		name: "GetEphemeralState",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.GetEphemeralState(common.Address{}, common.Hash{})
 		},
 		readOnly:   true,
@@ -112,7 +112,7 @@ var statedbMethods = []struct {
 	},
 	{
 		name: "GetPersistentPreimage",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.GetPersistentPreimage(common.Hash{})
 		},
 		readOnly:   true,
@@ -120,7 +120,7 @@ var statedbMethods = []struct {
 	},
 	{
 		name: "GetPersistentPreimageSize",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.GetPersistentPreimageSize(common.Hash{})
 		},
 		readOnly:   true,
@@ -128,7 +128,7 @@ var statedbMethods = []struct {
 	},
 	{
 		name: "GetEphemeralPreimage",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.GetEphemeralPreimage(common.Hash{})
 		},
 		readOnly:   true,
@@ -136,7 +136,7 @@ var statedbMethods = []struct {
 	},
 	{
 		name: "GetEphemeralPreimageSize",
-		call: func(statedb cc_api.StateDB) {
+		call: func(statedb api.StateDB) {
 			statedb.GetEphemeralPreimageSize(common.Hash{})
 		},
 		readOnly:   true,
@@ -164,29 +164,29 @@ func TestStateDB(t *testing.T) {
 
 var evms = []struct {
 	name        string
-	constructor func() cc_api.EVM
+	constructor func() api.EVM
 	statedbType interface{}
 }{
 	{
 		name: "EVM",
-		constructor: func() cc_api.EVM {
+		constructor: func() api.EVM {
 			return NewMockEVM(NewMockStateDB())
 		},
 		statedbType: &MockStateDB{},
 	},
 	{
 		name: "ReadOnlyEVM",
-		constructor: func() cc_api.EVM {
-			return cc_api.NewReadOnlyEVM(NewMockEVM(NewMockStateDB()))
+		constructor: func() api.EVM {
+			return api.NewReadOnlyEVM(NewMockEVM(NewMockStateDB()))
 		},
-		statedbType: &cc_api.ReadOnlyStateDB{},
+		statedbType: &api.ReadOnlyStateDB{},
 	},
 	{
 		name: "CommitSafeEVM",
-		constructor: func() cc_api.EVM {
-			return cc_api.NewCommitSafeEVM(NewMockEVM(NewMockStateDB()))
+		constructor: func() api.EVM {
+			return api.NewCommitSafeEVM(NewMockEVM(NewMockStateDB()))
 		},
-		statedbType: &cc_api.CommitSafeStateDB{},
+		statedbType: &api.CommitSafeStateDB{},
 	},
 }
 
@@ -204,18 +204,18 @@ func TestEVM(t *testing.T) {
 
 var storages = []struct {
 	name        string
-	constructor func() cc_api.Storage
+	constructor func() api.Storage
 }{
 	{
 		name: "PersistentStorage",
-		constructor: func() cc_api.Storage {
-			return cc_api.NewPersistentStorage(NewMockStateDB(), common.Address{})
+		constructor: func() api.Storage {
+			return api.NewPersistentStorage(NewMockStateDB(), common.Address{})
 		},
 	},
 	{
 		name: "EphemeralStorage",
-		constructor: func() cc_api.Storage {
-			return cc_api.NewEphemeralStorage(NewMockStateDB(), common.Address{})
+		constructor: func() api.Storage {
+			return api.NewEphemeralStorage(NewMockStateDB(), common.Address{})
 		},
 	},
 }
@@ -232,44 +232,44 @@ func TestAPIStorage(t *testing.T) {
 
 var apis = []struct {
 	name        string
-	constructor func() cc_api.API
+	constructor func() api.API
 	readOnly    bool
 	stateOnly   bool
 }{
 	{
 		name: "API",
-		constructor: func() cc_api.API {
+		constructor: func() api.API {
 			statedb := NewMockStateDB()
 			evm := NewMockEVM(statedb)
-			return cc_api.New(evm, common.Address{})
+			return api.New(evm, common.Address{})
 		},
 		readOnly:  false,
 		stateOnly: false,
 	},
 	{
 		name: "StateAPI",
-		constructor: func() cc_api.API {
+		constructor: func() api.API {
 			statedb := NewMockStateDB()
-			return cc_api.NewStateAPI(statedb, common.Address{})
+			return api.NewStateAPI(statedb, common.Address{})
 		},
 		readOnly:  false,
 		stateOnly: true,
 	},
 	{
 		name: "ReadOnlyAPI",
-		constructor: func() cc_api.API {
+		constructor: func() api.API {
 			statedb := NewMockStateDB()
-			evm := cc_api.NewReadOnlyEVM(NewMockEVM(statedb))
-			return cc_api.New(evm, common.Address{})
+			evm := api.NewReadOnlyEVM(NewMockEVM(statedb))
+			return api.New(evm, common.Address{})
 		},
 		readOnly:  true,
 		stateOnly: false,
 	},
 	{
 		name: "ReadOnlyStateAPI",
-		constructor: func() cc_api.API {
-			statedb := cc_api.NewReadOnlyStateDB(NewMockStateDB())
-			return cc_api.NewStateAPI(statedb, common.Address{})
+		constructor: func() api.API {
+			statedb := api.NewReadOnlyStateDB(NewMockStateDB())
+			return api.NewStateAPI(statedb, common.Address{})
 		},
 		readOnly:  true,
 		stateOnly: true,
@@ -285,18 +285,18 @@ func TestStateAPI(t *testing.T) {
 	)
 	for _, specs := range apis {
 		t.Run(specs.name, func(t *testing.T) {
-			api := specs.constructor()
-			r.NotNil(api.StateDB(), "StateDB should not be nil")
-			r.NotNil(api.Ephemeral(), "Ephemeral should not be nil")
-			r.NotNil(api.Persistent(), "Persistent should not be nil")
+			API := specs.constructor()
+			r.NotNil(API.StateDB(), "StateDB should not be nil")
+			r.NotNil(API.Ephemeral(), "Ephemeral should not be nil")
+			r.NotNil(API.Persistent(), "Persistent should not be nil")
 			if specs.stateOnly {
-				r.Nil(api.EVM(), "EVM should be nil")
-				r.Panics(func() { api.BlockHash(big.NewInt(0)) }, "BlockHash should panic")
-				r.Panics(func() { api.Block() }, "Block should panic")
+				r.Nil(API.EVM(), "EVM should be nil")
+				r.Panics(func() { API.BlockHash(big.NewInt(0)) }, "BlockHash should panic")
+				r.Panics(func() { API.Block() }, "Block should panic")
 			} else {
-				r.NotNil(api.EVM(), "EVM should not be nil")
-				r.NotPanics(func() { api.BlockHash(big.NewInt(0)) }, "BlockHash should not panic")
-				r.NotPanics(func() { api.Block() }, "Block should not panic")
+				r.NotNil(API.EVM(), "EVM should not be nil")
+				r.NotPanics(func() { API.BlockHash(big.NewInt(0)) }, "BlockHash should not panic")
+				r.NotPanics(func() { API.Block() }, "Block should not panic")
 			}
 		})
 	}

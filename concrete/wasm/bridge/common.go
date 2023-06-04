@@ -59,9 +59,9 @@ const (
 const (
 	Op_EVM_BlockHash OpCode = iota
 	Op_EVM_BlockTimestamp
+	Op_EVM_BlockGasLimit
 	Op_EVM_BlockNumber
 	Op_EVM_BlockDifficulty
-	Op_EVM_BlockGasLimit
 	Op_EVM_BlockCoinbase
 )
 
@@ -83,28 +83,27 @@ func (opcode *OpCode) Decode(data []byte) {
 }
 
 type BlockData struct {
-	Timestamp  *big.Int
+	Timestamp  uint64
+	GasLimit   uint64
 	Number     *big.Int
 	Difficulty *big.Int
-	GasLimit   *big.Int
 	Coinbase   common.Address
 }
 
 func (block *BlockData) Encode() []byte {
-	// NOTE: Slots could be smaller than 32 bytes
-	data := make([]byte, 32*4+20)
-	block.Timestamp.FillBytes(data[:32])
-	block.Number.FillBytes(data[32:64])
-	block.Difficulty.FillBytes(data[64:96])
-	block.GasLimit.FillBytes(data[96:128])
-	copy(data[128:148], block.Coinbase.Bytes())
+	data := make([]byte, 8*2+32*2+20)
+	block.Number.FillBytes(data[0:32])
+	block.Difficulty.FillBytes(data[32:64])
+	copy(data[64:72], Uint64ToBytes(block.Timestamp))
+	copy(data[72:80], Uint64ToBytes(block.GasLimit))
+	copy(data[80:100], block.Coinbase.Bytes())
 	return data
 }
 
 func (block *BlockData) Decode(data []byte) {
-	block.Timestamp = new(big.Int).SetBytes(data[:32])
-	block.Number = new(big.Int).SetBytes(data[32:64])
-	block.Difficulty = new(big.Int).SetBytes(data[64:96])
-	block.GasLimit = new(big.Int).SetBytes(data[96:128])
-	block.Coinbase = common.BytesToAddress(data[128:148])
+	block.Number = new(big.Int).SetBytes(data[0:32])
+	block.Difficulty = new(big.Int).SetBytes(data[32:64])
+	block.Timestamp = BytesToUint64(data[64:72])
+	block.GasLimit = BytesToUint64(data[72:80])
+	block.Coinbase = common.BytesToAddress(data[80:100])
 }

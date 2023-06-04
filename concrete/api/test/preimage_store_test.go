@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	cc_api "github.com/ethereum/go-ethereum/concrete/api"
+	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/crypto"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +30,7 @@ func TestBigPreimageStore(t *testing.T) {
 		r   = require.New(t)
 		sdb = NewMockStateDB()
 		evm = NewMockEVM(sdb)
-		api = cc_api.New(evm, common.Address{})
+		API = api.New(evm, common.Address{})
 	)
 	var (
 		radixCases    = []int{2, 4, 8, 16}
@@ -50,7 +50,7 @@ func TestBigPreimageStore(t *testing.T) {
 		for _, leafSize := range leafSizeCases {
 			for i, preimage := range preimageCases {
 				t.Run(fmt.Sprint("r", radix, "/l", leafSize, "/pi", i), func(t *testing.T) {
-					store := cc_api.NewPersistentBigPreimageStore(api, radix, leafSize)
+					store := api.NewPersistentBigPreimageStore(API, radix, leafSize)
 					root := store.AddPreimage(preimage)
 					retrivedPreimage := store.GetPreimage(root)
 					r.True(store.HasPreimage(root))

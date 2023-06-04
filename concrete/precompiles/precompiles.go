@@ -105,7 +105,7 @@ func RunPrecompile(evm api.EVM, addr common.Address, p api.Precompile, input []b
 		evm = api.NewReadOnlyEVM(evm)
 	}
 
-	api := api.New(evm, addr)
-	output, err := p.Run(api, input)
+	API := api.New(evm, addr)
+	output, err := p.Run(API, input)
 	return output, suppliedGas, err
 }
