@@ -52,11 +52,7 @@ func TestPrecompileRegistry(t *testing.T) {
 	r.NoError(err)
 	_frameworkData, err := pc.ABI.Unpack("getFramework", output)
 	r.NoError(err)
-	frameworkData, ok := _frameworkData[0].(struct {
-		Name    string `json:"name"`
-		Version string `json:"version"`
-		Source  string `json:"source"`
-	})
+	frameworkData, ok := _frameworkData[0].(FrameworkMetadata)
 	r.True(ok)
 	r.NotEmpty(frameworkData.Name)
 	r.NotEmpty(frameworkData.Version)
@@ -69,15 +65,7 @@ func TestPrecompileRegistry(t *testing.T) {
 	r.NoError(err)
 	_precompileData, err := pc.ABI.Unpack("getPrecompile", output)
 	r.NoError(err)
-	precompileData, ok := _precompileData[0].(struct {
-		Addr        common.Address `json:"addr"`
-		Name        string         `json:"name"`
-		Version     string         `json:"version"`
-		Author      string         `json:"author"`
-		Description string         `json:"description"`
-		Source      string         `json:"source"`
-		ABI         string         `json:"ABI"`
-	})
+	precompileData, ok := _precompileData[0].(PrecompileMetadata)
 	r.True(ok)
 	r.EqualValues(expectedMetadata, precompileData)
 
@@ -111,15 +99,7 @@ func TestPrecompileRegistry(t *testing.T) {
 	r.NoError(err)
 	_pcs, err := pc.ABI.Unpack("getPrecompiles", output)
 	r.NoError(err)
-	pcs, ok := _pcs[0].([]struct {
-		Addr        common.Address `json:"addr"`
-		Name        string         `json:"name"`
-		Version     string         `json:"version"`
-		Author      string         `json:"author"`
-		Description string         `json:"description"`
-		Source      string         `json:"source"`
-		ABI         string         `json:"ABI"`
-	})
+	pcs, ok := _pcs[0].([]PrecompileMetadata)
 	r.True(ok)
 	r.Equal(3, len(pcs))
 	contains := false

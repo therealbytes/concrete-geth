@@ -25,15 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/lib"
 )
 
-var (
-	precompiles          = make(map[common.Address]api.Precompile)
-	precompiledAddresses = make([]common.Address, 0)
-	precompileMetadata   = make([]PrecompileMetadata, 0)
-	metadataByAddress    = make(map[common.Address]*PrecompileMetadata)
-	metadataByName       = make(map[string]*PrecompileMetadata)
-)
-
-type PrecompileMetadata struct {
+type PrecompileMetadata = struct {
 	Addr        common.Address `json:"addr"`
 	Name        string         `json:"name"`
 	Version     string         `json:"version"`
@@ -42,6 +34,14 @@ type PrecompileMetadata struct {
 	Source      string         `json:"source"`
 	ABI         string         `json:"ABI"`
 }
+
+var (
+	precompiles          = make(map[common.Address]api.Precompile)
+	precompiledAddresses = make([]common.Address, 0)
+	precompileMetadata   = make([]PrecompileMetadata, 0)
+	metadataByAddress    = make(map[common.Address]*PrecompileMetadata)
+	metadataByName       = make(map[string]*PrecompileMetadata)
+)
 
 func AddPrecompile(addr common.Address, p api.Precompile, args ...interface{}) error {
 	var metadata PrecompileMetadata

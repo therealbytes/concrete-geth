@@ -28,6 +28,12 @@ import (
 //go:embed sol/abi/PrecompileRegistry.abi
 var precompileRegistryABI string
 
+type FrameworkMetadata = struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Source  string `json:"source"`
+}
+
 var PrecompileRegistryMetadata = PrecompileMetadata{
 	Name:        "PrecompileRegistry",
 	Version:     "0.1.0",
@@ -70,11 +76,7 @@ func (p *getFramework) RequiredGas(input []byte) uint64 {
 
 func (p *getFramework) Run(API api.API, input []byte) ([]byte, error) {
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
-		metadata := struct {
-			Name    string `json:"name"`
-			Version string `json:"version"`
-			Source  string `json:"source"`
-		}{
+		metadata := FrameworkMetadata{
 			"Concrete",
 			"0.1.0",
 			"https://github.com/therealbytes/concrete-geth",
