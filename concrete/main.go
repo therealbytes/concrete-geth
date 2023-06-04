@@ -32,8 +32,8 @@ type ConcreteApp interface {
 	RunWithArgs(args []string) error
 	RunWithOsArgs() error
 	Run() error
-	AddPrecompile(addr common.Address, pc api.Precompile) error
-	AddPrecompileWasm(addr common.Address, code []byte) error
+	AddPrecompile(addr common.Address, pc api.Precompile, args ...interface{}) error
+	AddPrecompileWasm(addr common.Address, code []byte, args ...interface{}) error
 }
 
 type concreteGeth struct {
@@ -63,16 +63,16 @@ func (a *concreteGeth) validateNewPCAddress(addr common.Address) error {
 	return nil
 }
 
-func (a *concreteGeth) AddPrecompile(addr common.Address, pc api.Precompile) error {
+func (a *concreteGeth) AddPrecompile(addr common.Address, pc api.Precompile, args ...interface{}) error {
 	if err := a.validateNewPCAddress(addr); err != nil {
 		return err
 	}
-	return precompiles.AddPrecompile(addr, pc)
+	return precompiles.AddPrecompile(addr, pc, args...)
 }
 
-func (a *concreteGeth) AddPrecompileWasm(addr common.Address, code []byte) error {
+func (a *concreteGeth) AddPrecompileWasm(addr common.Address, code []byte, args ...interface{}) error {
 	if err := a.validateNewPCAddress(addr); err != nil {
 		return err
 	}
-	return precompiles.AddPrecompile(addr, wasm.NewWasmPrecompile(code))
+	return precompiles.AddPrecompile(addr, wasm.NewWasmPrecompile(code), args...)
 }
