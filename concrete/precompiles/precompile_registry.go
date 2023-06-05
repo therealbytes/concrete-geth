@@ -39,11 +39,11 @@ var PrecompileRegistryMetadata = PrecompileMetadata{
 }
 
 var (
-	GetFrameworkGas            = uint64(10)
-	GetPrecompileGas           = uint64(10)
-	GetPrecompileByNameGas     = uint64(10)
-	GetPrecompiledAddressesGas = uint64(10)
-	GetPrecompilesGas          = uint64(10)
+	GetFrameworkGas                         = uint64(15)
+	GetPrecompileGas                        = uint64(50)
+	GetPrecompileByNameGas                  = uint64(5)
+	GetPrecompiledAddressesPerPrecompileGas = uint64(5)
+	GetPrecompilesPrePrecompileGas          = uint64(50)
 )
 
 func init() {
@@ -128,7 +128,7 @@ type getPrecompiledAddresses struct {
 }
 
 func (p *getPrecompiledAddresses) RequiredGas(input []byte) uint64 {
-	return GetPrecompiledAddressesGas
+	return GetPrecompiledAddressesPerPrecompileGas * uint64(len(precompiledAddresses))
 }
 
 func (p *getPrecompiledAddresses) Run(API api.API, input []byte) ([]byte, error) {
@@ -142,7 +142,7 @@ type getPrecompiles struct {
 }
 
 func (p *getPrecompiles) RequiredGas(input []byte) uint64 {
-	return GetPrecompilesGas
+	return GetPrecompilesPrePrecompileGas * uint64(len(precompileMetadata))
 }
 
 func (p *getPrecompiles) Run(concrete api.API, input []byte) ([]byte, error) {

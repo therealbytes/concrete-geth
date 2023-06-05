@@ -56,21 +56,21 @@ var (
 	}
 	DefaultPreimageRegistryGasTable = PreimageRegistryGasTable{
 		FailGas:               10,
-		AddPreimageGas:        10,
-		AddPreimagePerByteGas: 10,
-		HasPreimageGas:        10,
-		GetPreimageSizeGas:    10,
-		GetPreimageGas:        10,
-		GetPreimagePerByteGas: 10,
+		AddPreimageGas:        20000,
+		AddPreimagePerByteGas: 100,
+		HasPreimageGas:        1000,
+		GetPreimageSizeGas:    1000,
+		GetPreimageGas:        1000,
+		GetPreimagePerByteGas: 50,
 	}
 	DefaultBigPreimageRegistryGasTable = PreimageRegistryGasTable{
 		FailGas:               10,
-		AddPreimageGas:        10,
-		AddPreimagePerByteGas: 10,
-		HasPreimageGas:        10,
-		GetPreimageSizeGas:    10,
-		GetPreimageGas:        10,
-		GetPreimagePerByteGas: 10,
+		AddPreimageGas:        20000,
+		AddPreimagePerByteGas: 250,
+		HasPreimageGas:        1000,
+		GetPreimageSizeGas:    1000,
+		GetPreimageGas:        1000,
+		GetPreimagePerByteGas: 125,
 	}
 )
 
