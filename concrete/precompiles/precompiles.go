@@ -19,16 +19,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
 	"github.com/ethereum/go-ethereum/concrete/lib"
 )
 
+type Version = struct {
+	Major *big.Int `json:"major"`
+	Minor *big.Int `json:"minor"`
+	Patch *big.Int `json:"patch"`
+}
+
 type PrecompileMetadata = struct {
 	Addr        common.Address `json:"addr"`
 	Name        string         `json:"name"`
-	Version     string         `json:"version"`
+	Version     Version        `json:"version"`
 	Author      string         `json:"author"`
 	Description string         `json:"description"`
 	Source      string         `json:"source"`

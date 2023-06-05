@@ -38,14 +38,14 @@ var (
 var (
 	PreimageRegistryMetadata = PrecompileMetadata{
 		Name:        "PreimageRegistry",
-		Version:     "0.1.0",
+		Version:     Version{common.Big0, common.Big1, common.Big0},
 		Author:      "The concrete-geth Authors",
 		Description: "A registry of stored preimages indexed by their hash.",
 		Source:      "https://github.com/therealbytes/concrete-geth/tree/concrete/concrete/precompiles/preimage_registry.go",
 	}
 	BigPreimageRegistryMetadata = PrecompileMetadata{
 		Name:        "BigPreimageRegistry",
-		Version:     "0.1.0",
+		Version:     Version{common.Big0, common.Big1, common.Big0},
 		Author:      "The concrete-geth Authors",
 		Description: "A registry of stored preimage merkle trees indexed by their root hash.",
 		Source:      "https://github.com/therealbytes/concrete-geth/tree/concrete/concrete/precompiles/pi_registry.go",

@@ -32,7 +32,7 @@ var PrecompileRegistry *lib.PrecompileWithABI
 
 var PrecompileRegistryMetadata = PrecompileMetadata{
 	Name:        "PrecompileRegistry",
-	Version:     "0.1.0",
+	Version:     Version{common.Big0, common.Big1, common.Big0},
 	Author:      "The concrete-geth Authors",
 	Description: "A registry of precompiles indexed by address and name.",
 	Source:      "https://github.com/therealbytes/concrete-geth/tree/concrete/concrete/precompiles/precompile_registry.go",
@@ -63,9 +63,9 @@ func init() {
 }
 
 type FrameworkMetadata = struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Source  string `json:"source"`
+	Name    string  `json:"name"`
+	Version Version `json:"version"`
+	Source  string  `json:"source"`
 }
 
 type getFramework struct {
@@ -80,7 +80,7 @@ func (p *getFramework) Run(API api.API, input []byte) ([]byte, error) {
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		metadata := FrameworkMetadata{
 			"Concrete",
-			"0.1.0",
+			Version{common.Big0, common.Big1, common.Big0},
 			"https://github.com/therealbytes/concrete-geth",
 		}
 		return []interface{}{metadata}, nil

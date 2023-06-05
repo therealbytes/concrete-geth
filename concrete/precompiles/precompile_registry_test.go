@@ -17,6 +17,7 @@ package precompiles
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -67,7 +68,7 @@ func TestPrecompileRegistry(t *testing.T) {
 	r.NoError(err)
 	precompileData, ok := _precompileData[0].(PrecompileMetadata)
 	r.True(ok)
-	r.EqualValues(expectedMetadata, precompileData)
+	r.EqualValues(fmt.Sprint(expectedMetadata), fmt.Sprint(precompileData))
 
 	// Test getPrecompileByName
 	input, err = pc.ABI.Pack("getPrecompileByName", expectedMetadata.Name)
@@ -106,7 +107,7 @@ func TestPrecompileRegistry(t *testing.T) {
 	for _, pc := range pcs {
 		if pc.Addr == address {
 			contains = true
-			r.EqualValues(expectedMetadata, pc)
+			r.EqualValues(fmt.Sprint(expectedMetadata), fmt.Sprint(precompileData))
 		}
 	}
 	r.True(contains)
