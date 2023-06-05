@@ -28,10 +28,16 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+type ConcreteConfig struct {
+	PreimageRegistryConfig    precompiles.PreimageRegistryConfig
+	BigPreimageRegistryConfig precompiles.PreimageRegistryConfig
+}
+
 type ConcreteApp interface {
 	RunWithArgs(args []string) error
 	RunWithOsArgs() error
 	Run() error
+	SetConfig(config ConcreteConfig) error
 	AddPrecompile(addr common.Address, pc api.Precompile, args ...interface{}) error
 	AddPrecompileWasm(addr common.Address, code []byte, args ...interface{}) error
 }
@@ -54,6 +60,12 @@ func (a *concreteGeth) RunWithOsArgs() error {
 
 func (a *concreteGeth) Run() error {
 	return a.RunWithOsArgs()
+}
+
+func (a *concreteGeth) SetConfig(config ConcreteConfig) error {
+	precompiles.PreimageRegistry.SetConfig(config.PreimageRegistryConfig)
+	precompiles.BigPreimageRegistry.SetConfig(config.BigPreimageRegistryConfig)
+	return nil
 }
 
 func (a *concreteGeth) validateNewPCAddress(addr common.Address) error {

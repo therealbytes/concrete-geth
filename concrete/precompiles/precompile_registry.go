@@ -28,11 +28,7 @@ import (
 //go:embed sol/abi/PrecompileRegistry.abi
 var precompileRegistryABI string
 
-type FrameworkMetadata = struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Source  string `json:"source"`
-}
+var PrecompileRegistry *lib.PrecompileWithABI
 
 var PrecompileRegistryMetadata = PrecompileMetadata{
 	Name:        "PrecompileRegistry",
@@ -56,14 +52,20 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	precompileRegistry := lib.NewPrecompileWithABI(ABI, map[string]lib.MethodPrecompile{
+	PrecompileRegistry := lib.NewPrecompileWithABI(ABI, map[string]lib.MethodPrecompile{
 		"getFramework":            &getFramework{},
 		"getPrecompile":           &getPrecompile{},
 		"getPrecompileByName":     &getPrecompileByName{},
 		"getPrecompiledAddresses": &getPrecompiledAddresses{},
 		"getPrecompiles":          &getPrecompiles{},
 	})
-	AddPrecompile(api.PrecompileRegistryAddress, precompileRegistry, PrecompileRegistryMetadata)
+	AddPrecompile(api.PrecompileRegistryAddress, PrecompileRegistry, PrecompileRegistryMetadata)
+}
+
+type FrameworkMetadata = struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Source  string `json:"source"`
 }
 
 type getFramework struct {

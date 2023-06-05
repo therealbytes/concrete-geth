@@ -31,6 +31,11 @@ import (
 var preimageRegistryABI string
 
 var (
+	PreimageRegistry    *PreimageRegistryPrecompile
+	BigPreimageRegistry *PreimageRegistryPrecompile
+)
+
+var (
 	PreimageRegistryMetadata = PrecompileMetadata{
 		Name:        "PreimageRegistry",
 		Version:     "0.1.0",
@@ -45,6 +50,35 @@ var (
 		Description: "A registry of stored preimage merkle trees indexed by their root hash.",
 		Source:      "https://github.com/therealbytes/concrete-geth/tree/concrete/concrete/precompiles/pi_registry.go",
 	}
+	DefaultPreimageRegistryConfig = PreimageRegistryConfig{
+		Enabled:  true,
+		Writable: false,
+	}
+	DefaultPreimageRegistryGasTable = PreimageRegistryGasTable{
+		FailGas:               10,
+		AddPreimageGas:        10,
+		AddPreimagePerByteGas: 10,
+		HasPreimageGas:        10,
+		GetPreimageSizeGas:    10,
+		GetPreimageGas:        10,
+		GetPreimagePerByteGas: 10,
+	}
+	DefaultBigPreimageRegistryGasTable = PreimageRegistryGasTable{
+		FailGas:               10,
+		AddPreimageGas:        10,
+		AddPreimagePerByteGas: 10,
+		HasPreimageGas:        10,
+		GetPreimageSizeGas:    10,
+		GetPreimageGas:        10,
+		GetPreimagePerByteGas: 10,
+	}
+)
+
+var (
+	ErrPreimageRegistryDisabled = errors.New("preimage registry is disabled")
+	ErrPreimageRegistryReadOnly = errors.New("preimage registry is read-only")
+	ErrPreimageNotFound         = errors.New("preimage not found")
+	ErrPreimageTooLarge         = errors.New("provided preimage size too small")
 )
 
 func init() {
@@ -54,131 +88,141 @@ func init() {
 		panic(err)
 	}
 
-	preimageRegistry := NewPreimageRegistry(
+	PreimageRegistry = NewPreimageRegistry(
 		ABI,
 		func(API api.API) api.PreimageStore {
 			return API.Persistent()
 		},
-		preimageRegistryGasTable{
-			addPreimageGas:        10,
-			addPreimagePerByteGas: 10,
-			hasPreimageGas:        10,
-			getPreimageSizeGas:    10,
-			getPreimageGas:        10,
-			getPreimagePerByteGas: 10,
-		},
-		false,
+		DefaultPreimageRegistryConfig,
+		DefaultPreimageRegistryGasTable,
 	)
-	AddPrecompile(api.PreimageRegistryAddress, preimageRegistry, PreimageRegistryMetadata)
-
-	bigPreimageRegistry := NewPreimageRegistry(
+	BigPreimageRegistry = NewPreimageRegistry(
 		ABI,
 		func(API api.API) api.PreimageStore {
 			return api.NewPersistentBigPreimageStore(API, -1, -1)
 		},
-		preimageRegistryGasTable{
-			addPreimageGas:        10,
-			addPreimagePerByteGas: 10,
-			hasPreimageGas:        10,
-			getPreimageSizeGas:    10,
-			getPreimageGas:        10,
-			getPreimagePerByteGas: 10,
-		},
-		false,
+		DefaultPreimageRegistryConfig,
+		DefaultBigPreimageRegistryGasTable,
 	)
-	AddPrecompile(api.BigPreimageRegistryAddress, bigPreimageRegistry, BigPreimageRegistryMetadata)
+
+	AddPrecompile(api.PreimageRegistryAddress, PreimageRegistry, PreimageRegistryMetadata)
+	AddPrecompile(api.BigPreimageRegistryAddress, BigPreimageRegistry, BigPreimageRegistryMetadata)
 }
 
-type storeGetter func(api.API) api.PreimageStore
-
-type preimageRegistryGasTable struct {
-	addPreimageGas        uint64
-	addPreimagePerByteGas uint64
-	hasPreimageGas        uint64
-	getPreimageSizeGas    uint64
-	getPreimageGas        uint64
-	getPreimagePerByteGas uint64
+type PreimageRegistryGasTable struct {
+	FailGas               uint64
+	AddPreimageGas        uint64
+	AddPreimagePerByteGas uint64
+	HasPreimageGas        uint64
+	GetPreimageSizeGas    uint64
+	GetPreimageGas        uint64
+	GetPreimagePerByteGas uint64
 }
 
-func NewPreimageRegistry(ABI abi.ABI, getStore storeGetter, gasTable preimageRegistryGasTable, enableWrites bool) api.Precompile {
-	return lib.NewPrecompileWithABI(ABI, map[string]lib.MethodPrecompile{
-		"addPreimage": &addPreimage{
-			getStore: getStore,
-			gasTable: &gasTable,
-			enabled:  enableWrites,
-		},
-		"hasPreimage": &hasPreimage{
-			getStore: getStore,
-			gasTable: &gasTable,
-		},
-		"getPreimageSize": &getPreimageSize{
-			getStore: getStore,
-			gasTable: &gasTable,
-		},
-		"getPreimage": &getPreimage{
-			getStore: getStore,
-			gasTable: &gasTable,
-		},
+type PreimageRegistryConfig struct {
+	Enabled  bool
+	Writable bool
+}
+
+type PreimageRegistryPrecompile struct {
+	lib.PrecompileWithABI
+	getStore func(api.API) api.PreimageStore
+	Config   PreimageRegistryConfig
+	GasTable PreimageRegistryGasTable
+}
+
+func NewPreimageRegistry(ABI abi.ABI, getStore func(api.API) api.PreimageStore, config PreimageRegistryConfig, gasTable PreimageRegistryGasTable) *PreimageRegistryPrecompile {
+	registry := &PreimageRegistryPrecompile{
+		getStore: getStore,
+		Config:   config,
+		GasTable: gasTable,
+	}
+	registryMethod := blankRegistryMethod{registry: registry}
+	registry.PrecompileWithABI = *lib.NewPrecompileWithABI(ABI, map[string]lib.MethodPrecompile{
+		"addPreimage":     &addPreimage{registryMethod},
+		"hasPreimage":     &hasPreimage{registryMethod},
+		"getPreimageSize": &getPreimageSize{registryMethod},
+		"getPreimage":     &getPreimage{registryMethod},
 	})
+	return registry
+}
+
+func (p *PreimageRegistryPrecompile) SetConfig(config PreimageRegistryConfig) {
+	p.Config = config
+}
+
+func (p *PreimageRegistryPrecompile) RequiredGas(input []byte) uint64 {
+	if !p.Config.Enabled {
+		return p.GasTable.FailGas
+	}
+	return p.PrecompileWithABI.RequiredGas(input)
+}
+
+func (p *PreimageRegistryPrecompile) Run(API api.API, input []byte) ([]byte, error) {
+	if !p.Config.Enabled {
+		return nil, ErrPreimageRegistryDisabled
+	}
+	return p.PrecompileWithABI.Run(API, input)
+}
+
+type blankRegistryMethod struct {
+	lib.BlankMethodPrecompile
+	registry *PreimageRegistryPrecompile
 }
 
 type addPreimage struct {
-	lib.BlankMethodPrecompile
-	getStore storeGetter
-	gasTable *preimageRegistryGasTable
-	enabled  bool
+	blankRegistryMethod
 }
 
 func (p *addPreimage) RequiredGas(input []byte) uint64 {
-	if len(input) < 64 {
-		return 0
+	if !p.registry.Config.Writable {
+		return p.registry.GasTable.FailGas
 	}
-	return p.gasTable.addPreimageGas + p.gasTable.addPreimagePerByteGas*uint64(len(input)-64)
+	if len(input) < 64 {
+		return p.registry.GasTable.FailGas
+	}
+	return p.registry.GasTable.AddPreimageGas + p.registry.GasTable.AddPreimagePerByteGas*uint64(len(input)-64)
 }
 
 func (p *addPreimage) Run(API api.API, input []byte) ([]byte, error) {
-	if !p.enabled {
-		return nil, errors.New("writes to registry are disabled")
+	if !p.registry.Config.Writable {
+		return nil, ErrPreimageRegistryReadOnly
 	}
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		preimage := args[0].([]byte)
-		hash := p.getStore(API).AddPreimage(preimage)
+		hash := p.registry.getStore(API).AddPreimage(preimage)
 		return []interface{}{hash}, nil
 	}, API, input)
 }
 
 type hasPreimage struct {
-	lib.BlankMethodPrecompile
-	getStore storeGetter
-	gasTable *preimageRegistryGasTable
+	blankRegistryMethod
 }
 
 func (p *hasPreimage) RequiredGas(input []byte) uint64 {
-	return p.gasTable.hasPreimageGas
+	return p.registry.GasTable.HasPreimageGas
 }
 
 func (p *hasPreimage) Run(API api.API, input []byte) ([]byte, error) {
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		hash := common.Hash(args[0].([32]byte))
-		has := p.getStore(API).HasPreimage(hash)
+		has := p.registry.getStore(API).HasPreimage(hash)
 		return []interface{}{has}, nil
 	}, API, input)
 }
 
 type getPreimageSize struct {
-	lib.BlankMethodPrecompile
-	getStore storeGetter
-	gasTable *preimageRegistryGasTable
+	blankRegistryMethod
 }
 
 func (p *getPreimageSize) RequiredGas(input []byte) uint64 {
-	return p.gasTable.getPreimageSizeGas
+	return p.registry.GasTable.GetPreimageSizeGas
 }
 
 func (p *getPreimageSize) Run(API api.API, input []byte) ([]byte, error) {
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		hash := common.Hash(args[0].([32]byte))
-		size := p.getStore(API).GetPreimageSize(hash)
+		size := p.registry.getStore(API).GetPreimageSize(hash)
 		if size < 0 {
 			size = 0
 		}
@@ -187,15 +231,13 @@ func (p *getPreimageSize) Run(API api.API, input []byte) ([]byte, error) {
 }
 
 type getPreimage struct {
-	lib.BlankMethodPrecompile
-	getStore storeGetter
-	gasTable *preimageRegistryGasTable
+	blankRegistryMethod
 }
 
 func (p *getPreimage) RequiredGas(input []byte) uint64 {
 	return p.CallRequiredGasWithArgs(func(args []interface{}) uint64 {
 		size := args[0].(*big.Int)
-		return p.gasTable.getPreimageGas + p.gasTable.getPreimagePerByteGas*uint64(size.Int64())
+		return p.registry.GasTable.GetPreimageGas + p.registry.GasTable.GetPreimagePerByteGas*uint64(size.Int64())
 	}, input)
 }
 
@@ -203,13 +245,13 @@ func (p *getPreimage) Run(API api.API, input []byte) ([]byte, error) {
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		size := int(args[0].(*big.Int).Int64())
 		hash := common.Hash(args[1].([32]byte))
-		store := p.getStore(API)
+		store := p.registry.getStore(API)
 		if !store.HasPreimage(hash) {
-			return []interface{}{[]byte{}}, errors.New("preimage not found")
+			return []interface{}{[]byte{}}, ErrPreimageNotFound
 		}
 		realSize := store.GetPreimageSize(hash)
 		if size < realSize {
-			return []interface{}{[]byte{}}, errors.New("provided preimage size too small")
+			return []interface{}{[]byte{}}, ErrPreimageTooLarge
 		}
 		preimage := store.GetPreimage(hash)
 		return []interface{}{preimage}, nil

@@ -24,17 +24,24 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/api"
 )
 
+type MethodIDKey [4]byte
+
+func MethodIDToKey(methodID []byte) MethodIDKey {
+	return MethodIDKey{methodID[0], methodID[1], methodID[2], methodID[3]}
+}
+
 type MethodPrecompile interface {
 	api.Precompile
-	Init(method abi.Method)
+	Init(parent *PrecompileWithABI, method *abi.Method)
 }
 
 type BlankMethodPrecompile struct {
 	BlankPrecompile
-	Method abi.Method
+	Method *abi.Method
+	Parent *PrecompileWithABI
 }
 
-func (p *BlankMethodPrecompile) Init(method abi.Method) {
+func (p *BlankMethodPrecompile) Init(parent *PrecompileWithABI, method *abi.Method) {
 	p.Method = method
 }
 
@@ -70,21 +77,21 @@ var _ MethodPrecompile = &BlankMethodPrecompile{}
 
 type PrecompileWithABI struct {
 	ABI     abi.ABI
-	Methods map[string]api.Precompile
+	Methods map[MethodIDKey]api.Precompile
 }
 
 func NewPrecompileWithABI(contractABI abi.ABI, methods map[string]MethodPrecompile) *PrecompileWithABI {
 	p := &PrecompileWithABI{
 		ABI:     contractABI,
-		Methods: make(map[string]api.Precompile),
+		Methods: make(map[MethodIDKey]api.Precompile),
 	}
 	for name, method := range contractABI.Methods {
 		impl, ok := methods[name]
 		if !ok {
 			panic("missing implementation for " + name)
 		}
-		impl.Init(method)
-		p.Methods[string(method.ID)] = impl
+		impl.Init(p, &method)
+		p.Methods[MethodIDToKey(method.ID)] = impl
 	}
 	return p
 }
@@ -92,7 +99,7 @@ func NewPrecompileWithABI(contractABI abi.ABI, methods map[string]MethodPrecompi
 func (p *PrecompileWithABI) getMethod(input []byte) (api.Precompile, []byte, error) {
 	id := input[:4]
 	input = input[4:]
-	impl, ok := p.Methods[string(id)]
+	impl, ok := p.Methods[MethodIDToKey(id)]
 	if !ok {
 		return nil, nil, errors.New("invalid method ID")
 	}
