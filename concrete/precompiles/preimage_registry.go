@@ -137,7 +137,7 @@ func NewPreimageRegistry(ABI abi.ABI, getStore func(api.API) api.PreimageStore, 
 		Config:   config,
 		GasTable: gasTable,
 	}
-	registryMethod := blankRegistryMethod{registry: registry}
+	registryMethod := blankPreimageRegistryMethod{registry: registry}
 	registry.PrecompileWithABI = *lib.NewPrecompileWithABI(ABI, map[string]lib.MethodPrecompile{
 		"addPreimage":     &addPreimage{registryMethod},
 		"hasPreimage":     &hasPreimage{registryMethod},
@@ -165,13 +165,13 @@ func (p *PreimageRegistryPrecompile) Run(API api.API, input []byte) ([]byte, err
 	return p.PrecompileWithABI.Run(API, input)
 }
 
-type blankRegistryMethod struct {
+type blankPreimageRegistryMethod struct {
 	lib.BlankMethodPrecompile
 	registry *PreimageRegistryPrecompile
 }
 
 type addPreimage struct {
-	blankRegistryMethod
+	blankPreimageRegistryMethod
 }
 
 func (p *addPreimage) RequiredGas(input []byte) uint64 {
@@ -196,7 +196,7 @@ func (p *addPreimage) Run(API api.API, input []byte) ([]byte, error) {
 }
 
 type hasPreimage struct {
-	blankRegistryMethod
+	blankPreimageRegistryMethod
 }
 
 func (p *hasPreimage) RequiredGas(input []byte) uint64 {
@@ -212,7 +212,7 @@ func (p *hasPreimage) Run(API api.API, input []byte) ([]byte, error) {
 }
 
 type getPreimageSize struct {
-	blankRegistryMethod
+	blankPreimageRegistryMethod
 }
 
 func (p *getPreimageSize) RequiredGas(input []byte) uint64 {
@@ -231,7 +231,7 @@ func (p *getPreimageSize) Run(API api.API, input []byte) ([]byte, error) {
 }
 
 type getPreimage struct {
-	blankRegistryMethod
+	blankPreimageRegistryMethod
 }
 
 func (p *getPreimage) RequiredGas(input []byte) uint64 {

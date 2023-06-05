@@ -21,6 +21,8 @@ import (
 	"github.com/ethereum/go-ethereum/concrete/api"
 )
 
+var FailGas = uint64(10)
+
 type BlankPrecompile struct{}
 
 func (pc *BlankPrecompile) MutatesStorage(input []byte) bool {
@@ -68,7 +70,7 @@ func (d PrecompileDemux) MutatesStorage(input []byte) bool {
 func (d PrecompileDemux) RequiredGas(input []byte) uint64 {
 	pc, input, err := d.getSelection(input)
 	if err != nil {
-		return 0
+		return FailGas
 	}
 	return pc.RequiredGas(input)
 }

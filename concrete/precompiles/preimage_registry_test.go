@@ -22,13 +22,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
 	api_test "github.com/ethereum/go-ethereum/concrete/api/test"
-	"github.com/ethereum/go-ethereum/concrete/lib"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 )
 
 type preimageRegistryPCWrapper struct {
-	*lib.PrecompileWithABI
+	PreimageRegistryPrecompile
 	API api.API
 }
 
@@ -105,10 +104,9 @@ func TestPreimageRegistry(t *testing.T) {
 	var (
 		r        = require.New(t)
 		address  = api.PreimageRegistryAddress
-		pc       = precompiles[address].(*lib.PrecompileWithABI)
 		evm      = api_test.NewMockEVM(api_test.NewMockStateDB())
 		API      = api.New(evm, address)
-		wpc      = &preimageRegistryPCWrapper{PrecompileWithABI: pc, API: API}
+		wpc      = &preimageRegistryPCWrapper{*PreimageRegistry, API}
 		preimage = []byte("test.data")
 		hash     = crypto.Keccak256Hash(preimage)
 	)
@@ -148,10 +146,9 @@ func TestBigPreimageRegistry(t *testing.T) {
 		radix    = 16
 		leafSize = 64
 		address  = api.BigPreimageRegistryAddress
-		pc       = precompiles[address].(*lib.PrecompileWithABI)
 		evm      = api_test.NewMockEVM(api_test.NewMockStateDB())
 		API      = api.New(evm, address)
-		wpc      = &preimageRegistryPCWrapper{PrecompileWithABI: pc, API: API}
+		wpc      = &preimageRegistryPCWrapper{*BigPreimageRegistry, API}
 		preimage = []byte("test.data")
 	)
 
