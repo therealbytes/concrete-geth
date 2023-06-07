@@ -29,7 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -59,7 +58,7 @@ type Transaction struct {
 	size atomic.Value
 	from atomic.Value
 
-	// cache how much gas the tx takes on L1 for its share of rollup data
+	// cache of RollupGasData details to compute the gas the tx takes on L1 for its share of rollup data
 	rollupGas atomic.Value
 }
 
@@ -91,6 +90,14 @@ type TxData interface {
 
 	rawSignatureValues() (v, r, s *big.Int)
 	setSignatureValues(chainID, v, r, s *big.Int)
+
+	// effectiveGasPrice computes the gas price paid by the transaction, given
+	// the inclusion block baseFee.
+	//
+	// Unlike other TxData methods, the returned *big.Int should be an independent
+	// copy of the computed value, i.e. callers are allowed to mutate the result.
+	// Method implementations can use 'dst' to store the result.
+	effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int
 }
 
 // EncodeRLP implements rlp.Encoder
@@ -347,31 +354,27 @@ func (tx *Transaction) Cost() *big.Int {
 }
 
 // RollupDataGas is the amount of gas it takes to confirm the tx on L1 as a rollup
-func (tx *Transaction) RollupDataGas() uint64 {
+func (tx *Transaction) RollupDataGas() RollupGasData {
 	if tx.Type() == DepositTxType {
-		return 0
+		return RollupGasData{}
 	}
 	if v := tx.rollupGas.Load(); v != nil {
-		return v.(uint64)
+		return v.(RollupGasData)
 	}
 	data, err := tx.MarshalBinary()
 	if err != nil { // Silent error, invalid txs will not be marshalled/unmarshalled for batch submission anyway.
 		log.Error("failed to encode tx for L1 cost computation", "err", err)
 	}
-	var zeroes uint64
-	var ones uint64
+	var out RollupGasData
 	for _, byt := range data {
 		if byt == 0 {
-			zeroes++
+			out.Zeroes++
 		} else {
-			ones++
+			out.Ones++
 		}
 	}
-	zeroesGas := zeroes * params.TxDataZeroGas
-	onesGas := (ones + 68) * params.TxDataNonZeroGasEIP2028
-	total := zeroesGas + onesGas
-	tx.rollupGas.Store(total)
-	return total
+	tx.rollupGas.Store(out)
+	return out
 }
 
 // RawSignatureValues returns the V, R, S signature values of the transaction.
@@ -665,93 +668,6 @@ func (t *TransactionsByPriceAndNonce) Shift() {
 func (t *TransactionsByPriceAndNonce) Pop() {
 	heap.Pop(&t.heads)
 }
-
-// Message is a fully derived transaction and implements core.Message
-//
-// NOTE: In a future PR this will be removed.
-type Message struct {
-	to         *common.Address
-	from       common.Address
-	nonce      uint64
-	amount     *big.Int
-	gasLimit   uint64
-	gasPrice   *big.Int
-	gasFeeCap  *big.Int
-	gasTipCap  *big.Int
-	data       []byte
-	accessList AccessList
-	isFake     bool
-	// Optimism rollup fields
-	isSystemTx  bool
-	isDepositTx bool
-	mint        *big.Int
-	l1CostGas   uint64
-}
-
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool) Message {
-	return Message{
-		from:       from,
-		to:         to,
-		nonce:      nonce,
-		amount:     amount,
-		gasLimit:   gasLimit,
-		gasPrice:   gasPrice,
-		gasFeeCap:  gasFeeCap,
-		gasTipCap:  gasTipCap,
-		data:       data,
-		accessList: accessList,
-		isFake:     isFake,
-		// Optimism rollup fields
-		isSystemTx:  false,
-		isDepositTx: false,
-		mint:        nil,
-		l1CostGas:   0,
-	}
-}
-
-// AsMessage returns the transaction as a core.Message.
-func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
-	msg := Message{
-		nonce:      tx.Nonce(),
-		gasLimit:   tx.Gas(),
-		gasPrice:   new(big.Int).Set(tx.GasPrice()),
-		gasFeeCap:  new(big.Int).Set(tx.GasFeeCap()),
-		gasTipCap:  new(big.Int).Set(tx.GasTipCap()),
-		to:         tx.To(),
-		amount:     tx.Value(),
-		data:       tx.Data(),
-		accessList: tx.AccessList(),
-		isFake:     false,
-		// Optimism rollup fields
-		isSystemTx:  tx.inner.isSystemTx(),
-		isDepositTx: tx.IsDepositTx(),
-		mint:        tx.Mint(),
-		l1CostGas:   tx.RollupDataGas(),
-	}
-	// If baseFee provided, set gasPrice to effectiveGasPrice.
-	if baseFee != nil {
-		msg.gasPrice = math.BigMin(msg.gasPrice.Add(msg.gasTipCap, baseFee), msg.gasFeeCap)
-	}
-	var err error
-	msg.from, err = Sender(s, tx)
-	return msg, err
-}
-
-func (m Message) From() common.Address   { return m.from }
-func (m Message) To() *common.Address    { return m.to }
-func (m Message) GasPrice() *big.Int     { return m.gasPrice }
-func (m Message) GasFeeCap() *big.Int    { return m.gasFeeCap }
-func (m Message) GasTipCap() *big.Int    { return m.gasTipCap }
-func (m Message) Value() *big.Int        { return m.amount }
-func (m Message) Gas() uint64            { return m.gasLimit }
-func (m Message) Nonce() uint64          { return m.nonce }
-func (m Message) Data() []byte           { return m.data }
-func (m Message) AccessList() AccessList { return m.accessList }
-func (m Message) IsFake() bool           { return m.isFake }
-func (m Message) IsSystemTx() bool       { return m.isSystemTx }
-func (m Message) IsDepositTx() bool      { return m.isDepositTx }
-func (m Message) Mint() *big.Int         { return m.mint }
-func (m Message) RollupDataGas() uint64  { return m.l1CostGas }
 
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {

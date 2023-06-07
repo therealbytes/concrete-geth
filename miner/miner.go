@@ -18,6 +18,7 @@
 package miner
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"sync"
@@ -45,7 +46,7 @@ type Backend interface {
 }
 
 type BackendWithHistoricalState interface {
-	StateAtBlock(block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (statedb *state.StateDB, release tracers.StateReleaseFunc, err error)
+	StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error)
 }
 
 // Config is the configuration parameters of mining.
@@ -61,6 +62,8 @@ type Config struct {
 	Noverify   bool           // Disable remote mining solution verification(only useful in ethash).
 
 	NewPayloadTimeout time.Duration // The maximum time allowance for creating a new payload
+
+	RollupComputePendingBlock bool // Compute the pending block from tx-pool, instead of copying the latest-block
 }
 
 // DefaultConfig contains default settings for miner.

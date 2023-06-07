@@ -297,6 +297,14 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *trie.Database, gen
 	}
 	applyOverrides := func(config *params.ChainConfig) {
 		if config != nil {
+			if config.IsOptimism() && config.ChainID != nil && config.ChainID.Cmp(params.OptimismGoerliChainId) == 0 {
+				// Apply Optimism Goerli regolith time
+				config.RegolithTime = &params.OptimismGoerliRegolithTime
+			}
+			if config.IsOptimism() && config.ChainID != nil && config.ChainID.Cmp(params.BaseGoerliChainId) == 0 {
+				// Apply Base Goerli regolith time
+				config.RegolithTime = &params.BaseGoerliRegolithTime
+			}
 			if overrides != nil && overrides.OverrideShanghai != nil {
 				config.ShanghaiTime = overrides.OverrideShanghai
 			}

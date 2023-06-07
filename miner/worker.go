@@ -17,6 +17,7 @@
 package miner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -383,6 +384,9 @@ func (w *worker) enablePreseal() {
 
 // pending returns the pending state and corresponding block.
 func (w *worker) pending() (*types.Block, *state.StateDB) {
+	if w.chainConfig.Optimism != nil && !w.config.RollupComputePendingBlock {
+		return nil, nil // when not computing the pending block, there is never a pending state
+	}
 	// return a snapshot to avoid contention on currentMu mutex
 	w.snapshotMu.RLock()
 	defer w.snapshotMu.RUnlock()
@@ -394,6 +398,12 @@ func (w *worker) pending() (*types.Block, *state.StateDB) {
 
 // pendingBlock returns pending block.
 func (w *worker) pendingBlock() *types.Block {
+	if w.chainConfig.Optimism != nil && !w.config.RollupComputePendingBlock {
+		// For compatibility when not computing a pending block, we serve the latest block as "pending"
+		headHeader := w.eth.BlockChain().CurrentHeader()
+		headBlock := w.eth.BlockChain().GetBlock(headHeader.Hash(), headHeader.Number.Uint64())
+		return headBlock
+	}
 	// return a snapshot to avoid contention on currentMu mutex
 	w.snapshotMu.RLock()
 	defer w.snapshotMu.RUnlock()
@@ -402,6 +412,9 @@ func (w *worker) pendingBlock() *types.Block {
 
 // pendingBlockAndReceipts returns pending block and corresponding receipts.
 func (w *worker) pendingBlockAndReceipts() (*types.Block, types.Receipts) {
+	if w.chainConfig.Optimism != nil && !w.config.RollupComputePendingBlock {
+		return nil, nil // when not computing the pending block, there are no pending receipts, and thus no pending logs
+	}
 	// return a snapshot to avoid contention on currentMu mutex
 	w.snapshotMu.RLock()
 	defer w.snapshotMu.RUnlock()
@@ -457,6 +470,19 @@ func recalcRecommit(minRecommit, prev time.Duration, target float64, inc bool) t
 // newWorkLoop is a standalone goroutine to submit new sealing work upon received events.
 func (w *worker) newWorkLoop(recommit time.Duration) {
 	defer w.wg.Done()
+	if w.chainConfig.Optimism != nil && !w.config.RollupComputePendingBlock {
+		for { // do not update the pending-block, instead drain work without doing it, to keep producers from blocking.
+			select {
+			case <-w.startCh:
+			case <-w.chainHeadCh:
+			case <-w.resubmitIntervalCh:
+			case <-w.resubmitAdjustCh:
+			case <-w.exitCh:
+				return
+			}
+		}
+	}
+
 	var (
 		interrupt   *int32
 		minRecommit = recommit // minimal resubmit interval specified by user.
@@ -495,7 +521,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 	for {
 		select {
 		case <-w.startCh:
-			clearPending(w.chain.CurrentBlock().NumberU64())
+			clearPending(w.chain.CurrentBlock().Number.Uint64())
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
@@ -608,17 +634,20 @@ func (w *worker) mainLoop() {
 		case <-cleanTicker.C:
 			chainHead := w.chain.CurrentBlock()
 			for hash, uncle := range w.localUncles {
-				if uncle.NumberU64()+staleThreshold <= chainHead.NumberU64() {
+				if uncle.NumberU64()+staleThreshold <= chainHead.Number.Uint64() {
 					delete(w.localUncles, hash)
 				}
 			}
 			for hash, uncle := range w.remoteUncles {
-				if uncle.NumberU64()+staleThreshold <= chainHead.NumberU64() {
+				if uncle.NumberU64()+staleThreshold <= chainHead.Number.Uint64() {
 					delete(w.remoteUncles, hash)
 				}
 			}
 
 		case ev := <-w.txsCh:
+			if w.chainConfig.Optimism != nil && !w.config.RollupComputePendingBlock {
+				continue // don't update the pending-block snapshot if we are not computing the pending block
+			}
 			// Apply transactions to the pending state if we're not sealing
 			//
 			// Note all transactions received may not be continuous with transactions
@@ -791,14 +820,15 @@ func (w *worker) resultLoop() {
 }
 
 // makeEnv creates a new environment for the sealing block.
-func (w *worker) makeEnv(parent *types.Block, header *types.Header, coinbase common.Address) (*environment, error) {
+func (w *worker) makeEnv(parent *types.Header, header *types.Header, coinbase common.Address) (*environment, error) {
 	// Retrieve the parent state to execute on top and start a prefetcher for
 	// the miner to speed block sealing up a bit.
-	state, err := w.chain.StateAt(parent.Root())
+	state, err := w.chain.StateAt(parent.Root)
 	if err != nil && w.chainConfig.Optimism != nil { // Allow the miner to reorg its own chain arbitrarily deep
 		if historicalBackend, ok := w.eth.(BackendWithHistoricalState); ok {
 			var release tracers.StateReleaseFunc
-			state, release, err = historicalBackend.StateAtBlock(parent, ^uint64(0), nil, false, false)
+			parentBlock := w.eth.BlockChain().GetBlockByHash(parent.Hash())
+			state, release, err = historicalBackend.StateAtBlock(context.Background(), parentBlock, ^uint64(0), nil, false, false)
 			state = state.Copy()
 			release()
 		}
@@ -870,11 +900,14 @@ func (w *worker) updateSnapshot(env *environment) {
 }
 
 func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*types.Log, error) {
-	snap := env.state.Snapshot()
-
+	var (
+		snap = env.state.Snapshot()
+		gp   = env.gasPool.Gas()
+	)
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
+		env.gasPool.SetGas(gp)
 		return nil, err
 	}
 	env.txs = append(env.txs, tx)
@@ -1000,25 +1033,26 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 	// Find the parent block for sealing task
 	parent := w.chain.CurrentBlock()
 	if genParams.parentHash != (common.Hash{}) {
-		parent = w.chain.GetBlockByHash(genParams.parentHash)
-	}
-	if parent == nil {
-		return nil, fmt.Errorf("missing parent")
+		block := w.chain.GetBlockByHash(genParams.parentHash)
+		if block == nil {
+			return nil, fmt.Errorf("missing parent")
+		}
+		parent = block.Header()
 	}
 	// Sanity check the timestamp correctness, recap the timestamp
 	// to parent+1 if the mutation is allowed.
 	timestamp := genParams.timestamp
-	if parent.Time() >= timestamp {
+	if parent.Time >= timestamp {
 		if genParams.forceTime {
-			return nil, fmt.Errorf("invalid timestamp, parent %d given %d", parent.Time(), timestamp)
+			return nil, fmt.Errorf("invalid timestamp, parent %d given %d", parent.Time, timestamp)
 		}
-		timestamp = parent.Time() + 1
+		timestamp = parent.Time + 1
 	}
 	// Construct the sealing block header.
 	header := &types.Header{
 		ParentHash: parent.Hash(),
-		Number:     new(big.Int).Add(parent.Number(), common.Big1),
-		GasLimit:   core.CalcGasLimit(parent.GasLimit(), w.config.GasCeil),
+		Number:     new(big.Int).Add(parent.Number, common.Big1),
+		GasLimit:   core.CalcGasLimit(parent.GasLimit, w.config.GasCeil),
 		Time:       timestamp,
 		Coinbase:   genParams.coinbase,
 	}
@@ -1032,9 +1066,9 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 	}
 	// Set baseFee and GasLimit if we are on an EIP-1559 chain
 	if w.chainConfig.IsLondon(header.Number) {
-		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header())
-		if !w.chainConfig.IsLondon(parent.Number()) {
-			parentGasLimit := parent.GasLimit() * w.chainConfig.ElasticityMultiplier()
+		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent)
+		if !w.chainConfig.IsLondon(parent.Number) {
+			parentGasLimit := parent.GasLimit * w.chainConfig.ElasticityMultiplier()
 			header.GasLimit = core.CalcGasLimit(parentGasLimit, w.config.GasCeil)
 		}
 	}
