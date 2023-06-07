@@ -32,6 +32,14 @@ type Version = struct {
 	Patch *big.Int `json:"patch"`
 }
 
+func NewVersion(major, minor, patch int) Version {
+	return Version{
+		Major: big.NewInt(int64(major)),
+		Minor: big.NewInt(int64(minor)),
+		Patch: big.NewInt(int64(patch)),
+	}
+}
+
 type PrecompileMetadata = struct {
 	Addr        common.Address `json:"addr"`
 	Name        string         `json:"name"`

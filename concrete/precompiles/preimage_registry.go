@@ -31,6 +31,11 @@ import (
 var preimageRegistryABI string
 
 var (
+	BigPreimageStoreRadix    = 16
+	BigPreimageStoreLeafSize = 512
+)
+
+var (
 	PreimageRegistry    *PreimageRegistryPrecompile
 	BigPreimageRegistry *PreimageRegistryPrecompile
 )
@@ -90,7 +95,7 @@ func init() {
 
 	PreimageRegistry = NewPreimageRegistry(
 		ABI,
-		func(API api.API) api.PreimageStore {
+		func(registry *PreimageRegistryPrecompile, API api.API) api.PreimageStore {
 			return API.Persistent()
 		},
 		DefaultPreimageRegistryConfig,
@@ -98,8 +103,9 @@ func init() {
 	)
 	BigPreimageRegistry = NewPreimageRegistry(
 		ABI,
-		func(API api.API) api.PreimageStore {
-			return api.NewPersistentBigPreimageStore(API, -1, -1)
+		func(registry *PreimageRegistryPrecompile, API api.API) api.PreimageStore {
+			// TODO: make configurable
+			return api.NewPersistentBigPreimageStore(API, BigPreimageStoreRadix, BigPreimageStoreLeafSize)
 		},
 		DefaultPreimageRegistryConfig,
 		DefaultBigPreimageRegistryGasTable,
@@ -126,12 +132,12 @@ type PreimageRegistryConfig struct {
 
 type PreimageRegistryPrecompile struct {
 	lib.PrecompileWithABI
-	getStore func(api.API) api.PreimageStore
+	getStore func(*PreimageRegistryPrecompile, api.API) api.PreimageStore
 	Config   PreimageRegistryConfig
 	GasTable PreimageRegistryGasTable
 }
 
-func NewPreimageRegistry(ABI abi.ABI, getStore func(api.API) api.PreimageStore, config PreimageRegistryConfig, gasTable PreimageRegistryGasTable) *PreimageRegistryPrecompile {
+func NewPreimageRegistry(ABI abi.ABI, getStore func(*PreimageRegistryPrecompile, api.API) api.PreimageStore, config PreimageRegistryConfig, gasTable PreimageRegistryGasTable) *PreimageRegistryPrecompile {
 	registry := &PreimageRegistryPrecompile{
 		getStore: getStore,
 		Config:   config,
@@ -190,7 +196,7 @@ func (p *addPreimage) Run(API api.API, input []byte) ([]byte, error) {
 	}
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		preimage := args[0].([]byte)
-		hash := p.registry.getStore(API).AddPreimage(preimage)
+		hash := p.registry.getStore(p.registry, API).AddPreimage(preimage)
 		return []interface{}{hash}, nil
 	}, API, input)
 }
@@ -206,7 +212,7 @@ func (p *hasPreimage) RequiredGas(input []byte) uint64 {
 func (p *hasPreimage) Run(API api.API, input []byte) ([]byte, error) {
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		hash := common.Hash(args[0].([32]byte))
-		has := p.registry.getStore(API).HasPreimage(hash)
+		has := p.registry.getStore(p.registry, API).HasPreimage(hash)
 		return []interface{}{has}, nil
 	}, API, input)
 }
@@ -222,7 +228,7 @@ func (p *getPreimageSize) RequiredGas(input []byte) uint64 {
 func (p *getPreimageSize) Run(API api.API, input []byte) ([]byte, error) {
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		hash := common.Hash(args[0].([32]byte))
-		size := p.registry.getStore(API).GetPreimageSize(hash)
+		size := p.registry.getStore(p.registry, API).GetPreimageSize(hash)
 		if size < 0 {
 			size = 0
 		}
@@ -245,7 +251,7 @@ func (p *getPreimage) Run(API api.API, input []byte) ([]byte, error) {
 	return p.CallRunWithArgs(func(API api.API, args []interface{}) ([]interface{}, error) {
 		size := int(args[0].(*big.Int).Int64())
 		hash := common.Hash(args[1].([32]byte))
-		store := p.registry.getStore(API)
+		store := p.registry.getStore(p.registry, API)
 		if !store.HasPreimage(hash) {
 			return []interface{}{[]byte{}}, ErrPreimageNotFound
 		}

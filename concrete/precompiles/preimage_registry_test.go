@@ -22,9 +22,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/concrete/api"
 	api_test "github.com/ethereum/go-ethereum/concrete/api/test"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 )
+
+// TODO: test preimage registry config
 
 type preimageRegistryPCWrapper struct {
 	PreimageRegistryPrecompile
@@ -102,83 +103,72 @@ func (p *preimageRegistryPCWrapper) getPreimage(size uint64, hash common.Hash) (
 
 func TestPreimageRegistry(t *testing.T) {
 	var (
-		r        = require.New(t)
-		address  = api.PreimageRegistryAddress
-		evm      = api_test.NewMockEVM(api_test.NewMockStateDB())
-		API      = api.New(evm, address)
-		wpc      = &preimageRegistryPCWrapper{*PreimageRegistry, API}
-		preimage = []byte("test.data")
-		hash     = crypto.Keccak256Hash(preimage)
+		r       = require.New(t)
+		address = api.PreimageRegistryAddress
+		evm     = api_test.NewMockEVM(api_test.NewMockStateDB())
+		API     = api.New(evm, address)
 	)
 
-	has, err := wpc.hasPreimage(hash)
-	r.NoError(err)
-	r.False(has)
+	PreimageRegistry.SetConfig(PreimageRegistryConfig{
+		Enabled:  true,
+		Writable: true,
+	})
+	BigPreimageRegistry.SetConfig(PreimageRegistryConfig{
+		Enabled:  true,
+		Writable: true,
+	})
 
-	size, err := wpc.getPreimageSize(hash)
-	r.NoError(err)
-	r.Equal(uint64(0), size)
+	registries := []struct {
+		name     string
+		registry *PreimageRegistryPrecompile
+	}{
+		{
+			name:     "PreimageRegistry",
+			registry: PreimageRegistry,
+		},
+		{
+			name:     "BigPreimageRegistry",
+			registry: BigPreimageRegistry,
+		},
+	}
 
-	_, err = wpc.getPreimage(size, hash)
-	r.Error(err)
+	preimages := [][]byte{
+		[]byte(""),
+		[]byte("test.data"),
+		[]byte("test.data.other"),
+	}
 
-	// retHash, err := wpc.addPreimage(preimage)
-	// r.NoError(err)
-	retHash := API.Persistent().AddPreimage(preimage)
-	r.Equal(hash, retHash)
+	for _, registry := range registries {
+		t.Run(registry.name, func(t *testing.T) {
+			wpc := &preimageRegistryPCWrapper{*registry.registry, API}
+			for _, preimage := range preimages {
 
-	has, err = wpc.hasPreimage(hash)
-	r.NoError(err)
-	r.True(has)
+				has, err := wpc.hasPreimage(common.Hash{})
+				r.NoError(err)
+				r.False(has)
 
-	size, err = wpc.getPreimageSize(hash)
-	r.NoError(err)
-	r.Equal(uint64(len(preimage)), size)
+				size, err := wpc.getPreimageSize(common.Hash{})
+				r.NoError(err)
+				r.Equal(uint64(0), size)
 
-	retPreimage, err := wpc.getPreimage(size, hash)
-	r.NoError(err)
-	r.Equal(preimage, retPreimage)
-}
+				_, err = wpc.getPreimage(size, common.Hash{})
+				r.Error(err)
 
-func TestBigPreimageRegistry(t *testing.T) {
-	var (
-		r        = require.New(t)
-		radix    = 16
-		leafSize = 64
-		address  = api.BigPreimageRegistryAddress
-		evm      = api_test.NewMockEVM(api_test.NewMockStateDB())
-		API      = api.New(evm, address)
-		wpc      = &preimageRegistryPCWrapper{*BigPreimageRegistry, API}
-		preimage = []byte("test.data")
-	)
+				hash, err := wpc.addPreimage(preimage)
+				r.NoError(err)
 
-	otherHash := crypto.Keccak256Hash([]byte("test.other"))
+				has, err = wpc.hasPreimage(hash)
+				r.NoError(err)
+				r.True(has)
 
-	has, err := wpc.hasPreimage(otherHash)
-	r.NoError(err)
-	r.False(has)
+				size, err = wpc.getPreimageSize(hash)
+				r.NoError(err)
+				r.Equal(uint64(len(preimage)), size)
 
-	size, err := wpc.getPreimageSize(otherHash)
-	r.NoError(err)
-	r.Equal(uint64(0), size)
-
-	_, err = wpc.getPreimage(size, otherHash)
-	r.Error(err)
-
-	// retHash, err := wpc.addPreimage(preimage)
-	// r.NoError(err)
-	retHash := api.NewPersistentBigPreimageStore(API, radix, leafSize).AddPreimage(preimage)
-	// r.Equal(hash, retHash)
-
-	has, err = wpc.hasPreimage(retHash)
-	r.NoError(err)
-	r.True(has)
-
-	size, err = wpc.getPreimageSize(retHash)
-	r.NoError(err)
-	r.Equal(uint64(len(preimage)), size)
-
-	retPreimage, err := wpc.getPreimage(size, retHash)
-	r.NoError(err)
-	r.Equal(preimage, retPreimage)
+				retPreimage, err := wpc.getPreimage(size, hash)
+				r.NoError(err)
+				r.Equal(preimage, retPreimage)
+			}
+		})
+	}
 }
