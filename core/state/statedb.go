@@ -1259,6 +1259,13 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 	for hash := range s.persistentPreimagesPending {
 		s.persistentPreimagesRead[hash] = struct{}{}
 		preimage := s.persistentPreimages[hash]
+		// Check the cache before writing to disk
+		if cdb, ok := s.db.(*cachingDB); ok {
+			_, ok := cdb.concretePreimageCache.Get(hash)
+			if ok {
+				continue
+			}
+		}
 		rawdb.WriteConcretePreimage(persistentPreimageWriter, hash, preimage)
 	}
 	if len(s.persistentPreimagesPending) > 0 {
