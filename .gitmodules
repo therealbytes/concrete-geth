@@ -6,3 +6,6 @@
 	path = tests/evm-benchmarks
 	url = https://github.com/ipsilon/evm-benchmarks
 	shallow = true
+[submodule "concrete/testing/testdata/lib/forge-std"]
+	path = concrete/testing/testdata/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
