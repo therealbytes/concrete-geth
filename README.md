@@ -1,3 +1,7 @@
+*Moved to [concrete-eth/concrete-geth](https://github.com/concrete-eth/concrete-geth.git)*.
+
+---
+
 # Concrete
 
 Concrete is a framework for building application-specific rollups on the OP Stack.
